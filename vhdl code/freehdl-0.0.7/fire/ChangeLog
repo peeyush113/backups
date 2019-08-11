@@ -1,0 +1,183 @@
+2006-01-10  Stefan Jahn  <stefan@lkcc.org>
+
+	* timeval.h: Added implementation of gettimeofday() for native
+	Win32 platforms (e.g. MinGW32).
+
+2005-12-02  Stefan Jahn  <stefan@lkcc.org>
+
+	* tree-supp.cc (tree_base_node): Fixed a major 'free arbitrary
+	memory'	bug.
+
+2003-04-09  Marius Vollmer  <mvo@zagadka.de>
+
+	* fire-types.cc, test-fire.cc: Namespace games for GCC 3.
+
+	* test-fire.cc (main): Return int, as required.
+	
+2000-11-19  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-types.cc: Include <stdlib.h> and <string.h>.
+	(IR_String::operator=): Return `*this'.  Thanks to Philippe
+	Reynes!
+
+2000-08-10  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* Reorganized names of Attribute nodes.  Changed all references.
+
+2000-03-31  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* tree-supp.cc (gc_thresh, tree_set_gc_thresh): New.
+	(tree_collect_garbage): Collect only when threshold
+	has been surpassed.
+	(tree_maybe_collect_garbage): Removed.
+
+2000-02-07  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* fire-chunk.t: Moved to freehdl/.  Adapted everything else.
+	* gen-nodes: Deal with "-I" option for adding to the load-path.
+	
+1999-11-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-chunk.t (IIR_Declaration): New seqno slot.
+
+1999-09-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* tree-supp.cc, fire-types.cc, fire-types.h: Added "const"
+	qualifiers for correctness.
+
+1999-08-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-types.h: (IR_StaticLevel): New.
+
+	* fire-chunk.t (IR_StaticLevel): New.
+	(IIR_Expression): added static_level slot.
+
+1999-05-01  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-chunk.t: Renamed all ctypes so that they have valid C
+	identifiers.  Changed all uses.  Added `printer' option to ctypes.
+
+	* fire-types.cc (fire_print_bool, fire_print_int,
+	fire_print_string, fire_print_IR_String): New.
+	* fire-types.h: Prototypes for above.
+
+	* tree-supp.h (tree_kind_info, tree_prop_info): Added n_links
+	field.
+	(tree_ctype_info): New.
+
+	* tree-supp.cc (tree_base_node::mark): Use n_links instead of
+	n_slots.
+	(protector_node_kind_info): Initialize n_slots fields.
+	(tree_print_ctype): New.
+	(tree_print_children): Use tree_print_ctype for non-node slots.
+	
+	* gen-nodes (register-ctype): Push ctype onto the chunk's list of
+	ctypes.
+	(emit-header): Emit extern declarations of ctype info structs.
+	(emit-impl): Emit definitions of ctype info structs and use them
+	for slot infos of non-node slots for nodes and extensions.
+	
+	
+1999-04-26  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* tree-supp.cc (operator new, tree_histogram::tree_histogram,
+	enter, print): New.
+	* tree-supp.h (tree_histogram, operator new): New.
+	(tree_kind_info::size): New.
+	
+	* gen-nodes (emit-impl): Fill tree_kind_info::size field.
+	(emit-node-doc): emit description of inherited slots.
+
+1999-04-25  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* gen-nodes (node): Add `referenced' slot.
+	(build-node-xref, emit-node-doc, emit-all-node-docs, emit-doc):
+	New functions.
+	(toplevel): Recognize "doc" command.
+	
+1999-04-15  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-chunk.t (bool, int): Declare as ctypes.
+	* fire-chunk.t, fire-types.h, fire-types.cc, test-fire.cc
+	(IR_Boolean, IR_Int32, IR_Int64, IR_FP32, IR_P64,
+	IR_SourceLanguage, IIR_AbstractIntegerLiteral,
+	IIR_IntegerLiteral32, IIR_IntegerLiteral64,
+	IIR_AbstractFloatingPointLiteral, IIR_FloatingPointLiteral32,
+	IIR_FloatingPointLiteral64, fire_default_creator, IR_GenericList):
+	Removed.  Updated all uses.
+
+	* gen-nodes (generic-method-name): Take method object as argument.
+	Use new "prefix" option of method.  Changed all callers.
+	(register-generic): Pass generic options to register-methods.
+	(emit-header): Emit constructor in extension struct declaration.
+	Emit prototype for init function.
+	(emit-impl): Emit code to call init functions of all used chunks.
+	Emit constructor implementation of extension structs.  Use unique
+	key for each extension struct.
+
+	* tree-supp.cc (tree_uniq_prop_key): New.
+	(tree_generic::merge_mtabs): Removed.
+	(tree_conflicting_methods): New.
+
+	* tree-supp.h (tree_kind_info): Added next_prop_key and
+	next_derived_prop_key slots.
+	(tree_uniq_prop_key, tree_conflicting_methods): New prototype.
+	(tree_generic): Redone merge algorithm, correctly.
+	
+1999-03-13  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* tree-supp.cc (n_alloced, n_alloced_tally): New.
+	(n_nodes_alloced): Removed.  Changed all users of these statistics
+	variables.
+	(struct root_loc, root_locs, tree_protect_loc,
+	tree_unprotect_loc): New.
+	(tree_collect_garbage): Mark root locations in addition to
+	root_node.
+	(tree_maybe_collect_garbage): New.
+
+	* tree-supp.h (tree_protect_loc, tree_unprotect_loc,
+	tree_maybecollect_garbage): New prototypes.
+	
+1999-03-04  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-types.h (IR_String::to_chars_no_check): New, but unused.
+
+	* fire-chunk.t (IIR_ArchitectureRef): New, was previously defined
+	in vaul-chunk.t as Vaul_ArchitectureRef.  Changed all users.
+
+	* tree-supp.cc (verbose, tree_set_verbose): New.
+	(protector_node, protector_node_slot_info,
+	protector_node_kind_info, root_node, tree_protext,
+	tree_unprotect): New.
+	(tree_collect_garbage): Print out some statistics when VERBOSE is
+	true.  ROOT_NODE is now the only member of the root set, so start
+	the marking there.  Clear the markbit before calling delete on a
+	garbage node.
+	
+	* tree-supp.h (tree_set_verbose): New prototype.
+	(tree_base_node::proptab, n_props): Changed so that n_props is no
+	longer directly contained in the node struct but rather in the
+	prop table.  This saves one word per unextended node.  Adapted all
+	affected code.
+	(tree_base_node::marked, setmarkbit, clrmarkbit, gc_proptab):
+	Don't spent a whole word for the mark bit, put it into the LSB of
+	the proptab address instead and provide suitable accessor
+	functions.  Adapted all affected code.
+	(tree_base_node::retain, release, ref_count): Removed.
+	(retain, release): Removed.
+	(tree_protect, tree_unprotect): New prototypes.
+	
+1999-02-25  Marius Vollmer	 <mvo@dt.e-technik.uni-dortmund.de>
+
+	Do not use global objects with active constructors.  They lose on
+ 	SunOS (with egcs, at least).
+	
+	* tree-supp.h (tree_generic::tree_generic): Removed constructors
+ 	so that nobody tries to use them.
+	(tree_generic::init): New, for explicit initialization.
+
+	* gen-nodes (emit-impl): In generated code: do not use
+ 	tree_generic constructors.  Rather, initialize the tree_generic
+ 	structs explicitely in the chunk init function.  Do not create
+ 	partial generics for methods.  Rather, merge the chunk_tabs
+ 	directly.

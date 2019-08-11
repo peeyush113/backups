@@ -1,0 +1,522 @@
+2008-09-25  Stefan Jahn  <stefan@lkcc.org>
+
+	* freehdl-config (linker): Added --linker option to return the
+	appropriate system libtool (may be glibtool on e.g. MacOS).
+
+2008-02-16  Stefan Jahn  <stefan@lkcc.org>
+
+	* freehdl-config: Using pkg-config for determining compile and
+	linker flags.
+
+2007-05-23  Stefan Jahn  <stefan@lkcc.org>
+
+	* std-vhdl-types.hh: Fixed an off-by-one error during checking
+	array bounds.
+
+2004-12-01  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* fire-chunk.t: new node IIR_ImplicitProcessStatement added.
+ 
+2004-11-29   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-vhdl-types.hh: templates for shift operators on arrays
+	added.
+	
+2004-11-08   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-attributes.hh: function attr_scalar_LAST_EVENT and
+	attr_composite_LAST_EVENT added.
+
+	* std-standard.hh: lower and upper bounds of physical types set to
+	LONG_LONG_MIN and LONG_LONG_MAX.
+	
+2004-09-28   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-list.hh: includes "string.h", "limits.h" and "stdlib.h"
+	added.
+
+2004-09-08  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* kernel-list.hh: Include <stddef.h> for NULL.
+
+	* tree-supp.h: Moved prototypes used by template code before that
+	code, as required by GCC 3.4.
+
+2004-08-13  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-vhdl-types.hh (array_alias): problem with members info an
+	data in array_alias template fixed.
+	
+2004-07-23  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* freehdl-gennodes.in (my-eval): New; wrapper for eval that always
+	takes exactly one argument.
+	(get-fmt-func): Use it instead of eval.
+	
+2004-02-03  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* vaul-parser.h (vaul_parser::build_EnumerationType,
+	vaul_parser::get_scalar_type_range): New prototypes.
+
+	* vaul-lexer.h (vaul_pos_eq): New prototype.
+
+2004-01-30  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-vhdl-types.hh (array_type<E>::cleanup_instance(),
+	array_type<E>::init()): problem with arrays of composite types
+	fixed.
+
+2004-01-29  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* vaul-chunk.t (VAUL_VoidType): New.
+
+2003-07-27  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* standard.cc (attribute_image): new function adds support for
+	attribute image.
+
+	* standard.cc (attribute_value): new function adds support for
+	attribute value.	
+ 	
+2003-7-08   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-delayed-procedure-base.hh: new file.
+
+2002-06-03   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-vhdl-types.hh: type name access replaced with vhdlaccess to
+	prevent name clashing.
+ 
+2002-04-15   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-util.hh, kernel-map-list.hh,
+	kernel-signal-source-list-array.hh: added checks to include either
+	hash_map or ext/hash_map depending on C++ compiler.
+ 
+2002-04-10   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-dump.hh, dump.cc (signal_dump::write_value): definition
+	of inline method was in-visible at some points of usage.
+
+	* std-vhdl-types.cc: added function op_abs for integer, physical
+	and floatingpoint.
+
+2003-04-09  Marius Vollmer  <mvo@zagadka.de>
+
+	* cdfggen-chunk.t: Namespace games for GCC 3.
+
+	* std-vhdl-types.hh (min, max): Do not declare, they are provided
+	elsewhere already.
+
+	* fire-chunk.t, fire-types.h, kernel-dump.hh,
+	kernel-fhdl-stream.hh, kernel-map-list.hh, kernel-name-stack.hh,
+	kernel-signal-source-list-array.hh, kernel-util.hh,
+	std-vhdl-types.hh, std.h, vaul-lexer.h, vaul-printer.h,
+	vaul-types.h: Replaced deprecated headers with modern ones.
+	Namespace games for GCC 3.
+
+2002-07-16  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* vaul-parser.h (build_formal_Expr): New prototype.
+
+	* fire-chunk.t (IIR_AssociationElement): Added new slot
+	'formal_declaration'.
+
+2002-07-15  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* fire-chunk.t (IIR_AssociationElement): changed 'formal' slot to
+	be a IIR_Expression instead of a IIR_InterfaceDeclaration.
+	Partial associations will no longer be gathered into an artifical
+	aggregate.  Each partial association will result in its own
+	IIR_AssociationElement where the formal is a IIR_ObjectReference
+	expression referring to the corresponding part of the complete
+	formal.
+	* vaul-parser.h (association_one): Changed type of 'formal'
+	parameter to pIIR_ObjectReference.
+
+2002-02-18  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* fire-chunk.t (IIR_ArtificialRecordAggregate,
+	IIR_ArtificialArrayAggregate): New.
+
+2002-01-013   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-reader-info.hh, reader_info.cc : variable
+	last_active_wait_elements, constant dummy_wait_elements added and
+	function reset_last_active_wait_elements added. These items are
+	used to speed up process activation. Method
+	reader_info::acticate_processes extended to make use of this
+	improved process activation mechanisms.
+
+	* global_event_queue.cc: (g_trans_queue::assign_next_transactions)
+	extended to make use of the fast process activation mechanisms.
+  
+2002-01-07  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-printer.h (vaul_printer::format_out,
+	vaul_printer::string_out, vaul_std_printer): Removed.
+	Functionality is now in vaul_printer::vfprintf.
+	* vaul-types.h (vaul_node_printer): Likewise.
+	(vaul_default_printer): Removed.
+
+	* vaul-parser.h (vaul_error_printer): Use vaul_printer as base,
+	not vaul_node_printer.
+	(vaul_parser::format_out): Removed.  Functionality is now in
+	vaul_printer::vfprintf.
+	(vaul_parser::print_node): New.
+
+2002-01-02   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-kernel-class.hh, (kernel_class::compact_wait_elements):
+	new function to compact wait element lists addd.
+
+	* kernel-ist.hh (template class shared_array): new array template
+	class added.
+
+2001-12-16  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h (is_readable, is_writable): Removed.
+	(vaul_parser::overload_resolution): Added "for_read" parameter,
+	which defaults to true in the abbreviated variants of this
+	function.
+	(vaul_parse::overload_resolution_not_for_read): New, set
+	"for_read" to false.
+	(vaul_parser::associate_ports, vaul_parser::check_for_read,
+	vaul_parser::check_for_update): New.
+	
+	* fire-chunk.t (IIR_InterfaceDeclaration): Renamed "buffer" slot
+	to "bus".  Changed all references.
+
+2001-12-10  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* tree-supp.h (tree_base_node::is): Check for "this" to be
+	non-NULL.
+
+	* fire-chunk.t (IIR_UseClause): Changed used_unit to be of type
+	IIR_Declaration, not IIR_DeclarativeRegion.  The slot can also
+	point to a IIR_LibraryClause, which is not a declarative region.
+
+2001-12-06  Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-vhdl-types.hh: template functions for predefined array
+	operators fixed (template needs both parameters to be defined as
+	parameter types in order to accept operations between array_type
+	and array_alias)
+
+2001-10-24  Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-sig-info.hh: Introduced a signal component stack which
+	keeps track which signals are directly created within a
+	component. This data structure is required in order to create
+	signal soruces.
+
+2001-10-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h (vaul_parser::use_unit,
+	vaul_parser::make_scalar_subtype): New prototypes.
+
+	* kernel-register.hh (register_init_func, run_init_funcs): New
+	prototypes.
+
+	* fire-chunk.t (IIR_LibraryUnit): Added "used_units" slot.
+	* vaul-chunk.t (vaul_node_creator): Initialize it to "NULL".
+
+	The following changes make it possible to cleanly exit when an
+	error happens during initialization.
+	
+	* std-vhdl-types.hh (record_info::~record_info): Do nothing when
+	ref_count is less than zero.  Check whether element_types is
+	non-zero before freeing it.  These changes make it possible to
+	cleanly exit when an error happens during initialization.
+	(array_info::~array_info, record_type::cleanup_instance,
+	array_type::cleanup_instance): Likewise.
+	
+	* std-memory.hh (internal_dynamic_remove): Handle a NULL pointer
+	by doing nothing.
+
+2001-10-10  Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-vhdl-types.hh: Added missing support code for record types.
+
+2001-10-04  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* kernel-driver-info.hh (transport_assign, inertial_assign): Added
+	(tentative) definitions for assignments to elements of record
+	signals, using acls.
+
+2001-10-03  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* kernel-kernel-class.hh (kernel_class::elaborate_configuration,
+	kernel_class::elaborate_component): New.
+	(kernel_class::elaborate_configured_component): Commented out.
+	
+	* vaul-parser.h (vaul_parser::get_architecture): New.
+
+2001-09-30  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* std-vhdl-types.hh (record_type::cleanup_instance): Use
+	`rinof.data_size' instead of `rinfo.element_types' in the call to
+	`internal_dynamic_remove'.
+	(make_absolute): New.
+	(emit_source_file_register_code): Use it instead of
+	`get_design_file_name'.
+	(record_type::value): Also provide a "const" version.
+	(record_type::record_type): New constructor that accepts an `E'
+	structure.
+	
+2001-09-23  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h (vaul_merge_levels): Declare.
+
+	* vaul-creator-base.h (vaul_fix_static_level): Declare.
+	
+	* vaul-chunk.t (vaul_node_creator (IIR_Type)): Initialize
+	static_level slot and specify `construction-extra' function to
+	compute the real value for static_level.
+
+	* freehdl-gennodes.in: Added support for node-init options, and
+	the specific `construct-extra' option.
+
+	* fire-chunk.t (IIR_Type): Added `static_level' slot.
+
+2001-09-17  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h (vaul_add_incomplete_type_use): New prototype.
+	(vaul_complete_incomplete_type). Renamed from "complete".
+
+2001-09-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* std-vhdl-types.hh (record_info_base, record_base, record_type):
+	New, by uncommenting and some changes.
+	(array_alias::array_alias): Make IARRAY const (for the sake of
+	some generated code that requires this).  Not entirely clean...
+	Disallow `new' and `delete' on record_info_base.
+
+	* freehdl-gennodes.in (start-chunk): Use `eval' instead of
+	`eval-in-module'.
+
+	* Makefile.am (freehdl_HEADERS): Added cdfggen-chunk.h so that it
+	is properly distributed.
+
+2001-09-05  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h (vaul_decl_set::has_filter): New.
+	(vaul_parser_options): New, use instead of old bit flags.
+
+	* vaul-dfile.h: Use new vaul_parser_options instead of parser
+	flags.
+
+2001-08-08  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-chunk.t (VAUL_FilenameAndMode): New.
+	* vaul-parser.h (vaul_parser::add_File): Use it instead of a lone
+	filename to pass '87 open mode.
+
+	* std-standard.hh (DBL_MAX): Removed definition. Include
+	"float.h".
+
+2001-04-03   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-persistent-lisp-dump.hh: file name changed to 
+	kernel-persisten-cdfg-dump.hh
+	* persistent_lisp_dump.cc: file name changed to 
+	persistent_cdfg_dump.cc
+	* kernel-resolver-descriptor.hh, resolver_descriptor.cc,
+	std-vhdl-types.hh: resolved types are now registered 
+	during simulation startup to enables signal resolution
+	by the kernel
+	
+2001-03-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-chunk.t (IIR_ConcurrentGenerateStatement): Added
+	configuration_specifications slot.
+	* vaul-chunk.t (vaul_node_creator): Initialize this slot to NULL.
+	
+2001-02-22   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-vhdl-types.hh, vhdl_types.cc: bug function endfile
+	fixed
+	
+2001-02-20   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-standard.hh, standard.cc: predefined function "now"
+	added
+	* internal_textio.cc: support for package std.textio added
+	
+2001-02-08   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-kernel-class.hh: support for component instantiation 
+	via default binding added
+	
+2001-02-05  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h (vaul_parser::find_component_configuration): Pass
+	complete binding indication, not just the bound unit.
+
+	* freehdl-gennodes.in: Load (ice-9 rdelim) module when read-line
+	is not defined.
+
+2001-01-31  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-chunk.t (VAUL_StandardPackage): Added
+	predef_FILE_OPEN_STATUS.
+	(vaul_node_creator): Initialize it to NULL.
+
+2001-01-22  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h (vaul_parser::build_Subtype,
+	vaul_parser::build_ArraySubtype_or_ScalarSubtype): Renamed
+	build_ArraySubtype_or_ScalarSubtype to build_Subtype.
+
+2001-01-23  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* vaul-parser.h (vaul_parser::build_FileType,
+	vaul_parser::legal_file_type): New.
+
+	* fire-chunk.t (IIR_RecordSubtype): New, used instead of
+	IIR_Subtype for subtypes of records.
+
+2001-01-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-chunk.t (IIR_PredefinedProcedureDeclaration,
+	IIR_PredefinedFunctionDeclaration): New nodes.  They are used to
+	distinguish builtin procedures and functions from user-defined
+	ones.  IIR_PredefinedFunctionDeclaration replaces VAUL_PredefOp
+	everywhere.
+
+	* vaul-chunk.t (VAUL_PredefOp): Removed, replaced by
+	IIR_PredefinedFunctionDeclaration.
+
+2001-01-12  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h (vaul_decl_set::set_filter,
+	vaul_decl_set::filter_func, vaul_decl_set::filter_data,
+	vaul_decl_set::use_cache): Added.
+	(vaul_parser::build_BindingIndic): Added pos parameter.  Changed
+	callers.
+	(vaul_parser::add_spec): Take a IIR_DeclarativeRegion instead of a
+	IIR_BlockStatement so that it also works on
+	IIR_ArchitectureDeclarations.
+	
+	* fire-chunk.t (IIR_ArchitectureDeclaration): Added
+	configuration_specifications slot.
+	(IIR_ConfigurationSpecification): Simplified.  Only one label is
+	allowed, not a list of them.  A individual node is used for ALL
+	and OTHERS specifications.
+	(IIR_LabelledBindingIndication,
+	IIR_LabelledBindingIndicationList): Removed.
+
+	* vaul-chunk.t (vaul_node_creator): Initialize
+	configuration_specifications of IIR_ArchitectureDeclaration to
+	NULL.
+
+2001-01-06  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-chunk.t (IIR_ConfigurationSpecificationList,
+	IIR_IdentifierList, IIR_BindingIndication,
+	IIR_LabelledBindingIndication, IIR_LabelledBindingIndicationList):
+	New nodes.
+	(IIR_ConfigurationSpecification): Added `component', `labels' and
+	`others' slots.
+	(IIR_BlockStatement): Added `configuration_specifications' slots.
+	(IIR_ComponentInstantiationStatement): Now only has `binding' and
+	`configuration' slots.
+	Changed all uses.
+
+	* vaul-chunk.t (VAUL_IdList): Removed.  Replaced with
+	IIR_IdentifierList.
+	(VAUL_BindingIndic): Removed.  Replaced with
+	IIR_BindingIndication.
+
+	* vaul-parser.h (vaul_parser::find_component_configuration,
+	vaul_parser::add_spec): New.
+	(vaul_parser::bind_specs): Removed.
+	
+2000-12-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* kernel-register.hh, kernel-Xinfo-data-descriptor.hh: Replaced
+	"or" with "r" throughout. "or" seems to be a keyword in C++.
+	Thanks to Philippe Reynes!
+
+	* vaul-types.h, vaul-parser.h, fire-chunk.t:  Name space hygiene.
+
+2000-11-19  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-parser.h: Replaced "or" with "r" throughout. "or" seems to
+	be a keyword in C++.  Thanks to Philippe Reynes!
+
+2000-09-22  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-types.h (vaul_default_printer): New.
+
+	* vaul-parser.h (VAUL_PARSER_SKIP_BODIES): New.
+
+	* vaul-lexer.h (vaul_lexer::skip_bodies, vaul_lexer::skipping):
+	New.
+
+	* freehdl-gennodes.in (string-append*): New function, use it
+	everywhere instead of string-append.
+	(string-map, syllables): Handle symbols explicitly.
+
+2000-08-30  Yu Zhang <zhang@ida.ing.tu-bs.de>
+	
+	* kernel-stack-trace.hh (trace_source()): New function
+	used to get current stack information and translate
+	the addresses into source file names and line numbers.
+	
+2000-08-11  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* vaul-parser.h
+	(vaul_parser::build_ArraySubtype_or_ScalarSubtype): New.
+
+2000-08-10  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* Reorganized names of Attribute nodes.  Changed all references.
+
+2000-07-26  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire-chunk.t (IIR_ObjectDeclaration): Added `alias_base' slot.
+	This slot will normally be NULL, but when the ObjectDelaration is
+	the result of an alias declaration, it will be a ObjectReference
+	to the original object.
+	(IIR_AliasDeclaration): Removed.
+
+	* vaul-chunk.t (vaul_creator): Initialize alias_base slot of
+	IIR_ObjectDeclaration to NULL.
+
+	* vaul-parser.h (vaul_parser::add_Alias): Changed return type to
+	IIR_Declaration.
+
+	* Makefile.am (freehdl-gennodes): Correctly use $(includedir)
+	instead of $(incdir).
+
+2000-07-13  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* fire-chunk.t (IIR_LibraryUnit): added `external_decls' slot.
+	* vaul-chunk.t (vaul_creator): Initialize external_decls of
+	IIR_LibraryUnit.
+
+	* vaul-parser.h (vaul_decl_set): Expect vaul_parser in constructor
+	and use that instead of the former vaul_error_printer.  Changed
+	all callers.
+	
+2000-04-28  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* fire-chunk.t (IIR_ArrayRange, IIR_ArrayAttr): New slot
+	`array_type' that holds the type of the array even when `array' is
+	NULL.
+
+2000-03-31  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* vaul-lexer.h (maybe_complain_about_improper_underscores): New.
+
+	* tree-supp.h (tree_set_gc_thresh): New
+	(tree_maybe_collect_garbage): Removed.
+
+2000-02-07  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* vaul.h: Do not #include <vaulgens-chunk.h>.
+	* vaulgens-chunk.h: Removed.
+	* vaul-types.h: Declare generic functions exported by vaul.
+	* Makefile.am: Various reorganizations.
+

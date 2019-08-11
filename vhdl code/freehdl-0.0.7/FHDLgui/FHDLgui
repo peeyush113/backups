@@ -1,0 +1,135 @@
+#!/usr/bin/wish
+#### Initialisation des variables
+set nomfich "No selected file"
+set simtime "No time selected"
+set simtimeunit ns
+set DINO_PATH /usr/local/bin/dinotrace
+set GVHDL_PATH /home/ph/freeHDL/freehdl-20001229/v2cc/gvhdl
+set PICT_PATH ./pictures   
+
+#### Déclaration des différentes procédures
+
+## Affiche le contenu d'un fichier text nomfich dans un widget text nomwidgtext 
+proc aff_fich {nomfich nomwidgtext} {
+set sortie [open $nomfich r]
+while {[eof $sortie]==0} {
+gets $sortie une_ligne
+$nomwidgtext insert end $une_ligne
+$nomwidgtext insert end "\n"
+}
+$nomwidgtext yview moveto 1
+close $sortie
+}       
+## Procédure associée au bouton Compilation
+proc comp {} {
+global fichier
+global GVHDL_PATH
+catch { exec >& gvhdl.out $GVHDL_PATH $fichier} 
+aff_fich gvhdl.out .frm2.frm1.txt
+}
+
+## Procédure associée au bouton Simulation
+proc simu {} {
+global fichier
+global simtime
+global simtimeunit
+set liste [split $fichier .] 
+set liste [lindex $liste 0]
+exec >& simu.out $liste -cmd "d;run $simtime $simtimeunit ;q;"
+aff_fich simu.out .frm3.frm1.txt
+}
+
+
+wm geometry . 640x480+50+50
+
+
+#### titre FreeHDL
+image create photo titre -format gif -file $PICT_PATH/titre.gif  
+label .lbl1 -background black -height 100 -image titre
+pack configure .lbl1 -side top -pady 0 -ipady 0 -fill x
+
+#### 3 frames  du bas
+frame .frm2 -background black  
+pack configure .frm2 -side top -pady 0  -ipady 0 -fill both -expand 1
+frame .frm3 -background black  
+pack configure .frm3 -side top -pady 0  -ipady 0 -fill both -expand 1
+frame .frm4 -background black  
+pack configure .frm4 -side top -pady 0  -ipady 0 -fill both -expand 1
+
+#### labels des 3 frames
+image create photo compilation -format gif -file $PICT_PATH/compilation.gif
+label .frm2.lbl0 -background black -image compilation
+pack configure .frm2.lbl0 -side top -pady 0  -ipady 0 -fill x 
+image create photo simulation -format gif -file $PICT_PATH/simulation.gif
+label .frm3.lbl0 -background black -image simulation
+pack configure .frm3.lbl0 -side top -pady 0  -ipady 0 -fill x 
+image create photo waveform_viewing -format gif -file $PICT_PATH/waveform_viewing.gif
+label .frm4.lbl0 -background black -image waveform_viewing 
+pack configure .frm4.lbl0 -side top -pady 0  -ipady 0 -fill x 
+
+#### Contenu frame "compilation"
+frame .frm2.frm0 -background black
+pack configure .frm2.frm0 -pady 0  -ipady 0 -side top  
+frame .frm2.frm1 -background black
+pack configure .frm2.frm1 -side top -pady 0  -ipady 0 -fill both -expand 1
+
+label .frm2.frm0.lbl1 -text "Selected File :" -foreground green -background black
+pack configure .frm2.frm0.lbl1 -side left   
+entry .frm2.frm0.ent0 -textvariable nomfich 
+pack configure .frm2.frm0.ent0 -side left 
+button .frm2.frm0.btn0 -text "Select File" -command {set fichier [tk_getOpenFile]; set cheminliste [file split $fichier]; set longueur [llength $cheminliste]; set indicenom [expr $longueur -1]; set nomfich [lindex $cheminliste $indicenom]  }
+pack configure .frm2.frm0.btn0 -side left
+text .frm2.frm1.txt -height 5 -width 40 -yscrollcommand ".frm2.frm1.scrllbr set"
+pack configure .frm2.frm1.txt -side left -fill both  -expand 1   
+scrollbar .frm2.frm1.scrllbr -orient vertical -command ".frm2.frm1.txt yview"
+pack configure .frm2.frm1.scrllbr -side left -fill y -expand 0
+image create photo button_compile_pressed -format gif -file $PICT_PATH/button_compile_pressed.gif  
+image create photo button_compile_released -format gif -file $PICT_PATH/button_compile_released.gif     
+
+#button .frm2.frm1.btn1 -image bouton -relief flat -borderwidth 0 -highlightthickness  0  -activebackground black -activeforeground black  -background black -foreground black  -command {comp}   
+#pack configure .frm2.frm1.btn1  -side right   
+checkbutton .frm2.frm1.chkbtn  -indicatoron 0 -relief flat -borderwidth 0 -highlightthickness  0  -activebackground black -activeforeground black  -background black -foreground black -image button_compile_released -selectimage button_compile_pressed  -variable compile
+pack configure .frm2.frm1.chkbtn -side right
+bind .frm2.frm1.chkbtn <ButtonRelease> {comp; set compile 0}   
+
+
+####  Contenu frame "Simulation"
+frame .frm3.frm0 -background black
+pack configure .frm3.frm0 -pady 0  -ipady 0 -side top 
+frame .frm3.frm1 -background black
+pack configure .frm3.frm1 -side top -pady 0  -ipady 0 -fill both -expand 1 
+
+label .frm3.frm0.lbl1 -text "Simulation time :" -foreground green -background black  
+pack configure .frm3.frm0.lbl1 -side left    
+entry .frm3.frm0.ent0 -textvariable simtime
+pack configure .frm3.frm0.ent0 -side left  
+menubutton .frm3.frm0.mnbt0 -textvariable simtimeunit -menu .frm3.frm0.mnbt0.mn0
+menu .frm3.frm0.mnbt0.mn0
+.frm3.frm0.mnbt0.mn0 add command -label ms -command {set simtimeunit ms}
+.frm3.frm0.mnbt0.mn0 add command -label us -command {set simtimeunit us}
+.frm3.frm0.mnbt0.mn0 add command -label ns -command {set simtimeunit ns}
+.frm3.frm0.mnbt0.mn0 add command -label ps -command {set simtimeunit ps}
+pack configure .frm3.frm0.mnbt0 -side left
+text .frm3.frm1.txt -height 5 -width 40 -yscrollcommand ".frm3.frm1.scrllbr set"
+pack configure .frm3.frm1.txt -side left -fill both -expand 1
+scrollbar .frm3.frm1.scrllbr -orient vertical -command ".frm3.frm1.txt yview"
+pack configure .frm3.frm1.scrllbr -side left -fill y -expand 0 
+#button .frm3.frm1.btn1 -text "Simulate" -background red -command {simu}
+#pack configure .frm3.frm1.btn1 -side right 
+image create photo button_simulate_pressed -format gif -file $PICT_PATH/button_simulate_pressed.gif
+image create photo button_simulate_released -format gif -file $PICT_PATH/button_simulate_released.gif
+checkbutton .frm3.frm1.chkbtn  -indicatoron 0 -relief flat -borderwidth 0 -highlightthickness  0  -activebackground black -activeforeground black  -background black -foreground black -image button_simulate_released -selectimage button_simulate_pressed  -variable simule
+pack configure .frm3.frm1.chkbtn -side right
+bind .frm3.frm1.chkbtn <ButtonRelease> {simu; set simule 0} 
+
+####  Contenu frame "Waveform Viewing"
+label .frm4.lbl1 -text "The VCD file is visualized with DINOTRACE"  -foreground green -background black
+pack configure .frm4.lbl1 -side left  -expand 1  
+#button .frm4.btn1 -text "View waveforms" -background red -command {puts "FHDLgui : launching dinotrace";exec $dinotrace wave.dmp}
+#pack configure .frm4.btn1 -side right    
+image create photo button_view_pressed -format gif -file $PICT_PATH/button_view_pressed.gif
+image create photo button_view_released -format gif -file $PICT_PATH/button_view_released.gif
+checkbutton .frm4.chkbtn  -indicatoron 0 -relief flat -borderwidth 0 -highlightthickness  0  -activebackground black -activeforeground black  -background black -foreground black -image button_view_released -selectimage button_view_pressed  -variable view
+pack configure .frm4.chkbtn -side right
+bind .frm4.chkbtn <ButtonRelease> {set view 0; exec $DINO_PATH wave.dmp}                                              
+

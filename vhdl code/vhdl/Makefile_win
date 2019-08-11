@@ -1,0 +1,80 @@
+
+#
+# Makefile for Microsoft nmake
+#
+# The dependencies are entirely wrong, so don't rely on this
+# Makfile correctly recompiling when a .h file changes.
+#
+
+DEBUG     = -Zi
+EXCEPT	  = -GX
+CFLAGS    = $(DEBUG) $(EXCEPT) -TP 
+OBJ       = obj
+EXE       = .exe
+DOXYPATH = c:\doxygen\bin
+DOXY_CONFIG = doxygenTemplate
+INCLUDE = -I "include" -I "c:\Program Files\Microsoft Visual Studio\VC98\Include"
+
+MAIN_OBJ  = main\globals.$(OBJ) main\main.$(OBJ)
+MEM_OBJ   = mem\bigblock.$(OBJ) mem\blockpool.$(OBJ)
+SKEL_OBJ  = skel\hash_serv.$(OBJ) skel\output.$(OBJ)
+SYM_OBJ   = sym\strtable.$(OBJ) sym\sym.$(OBJ) sym\type.$(OBJ) sym\typetable.$(OBJ) sym\symtable.$(OBJ)
+
+VHDL_OBJ = $(MAIN_OBJ) $(MEM_OBJ) $(SKEL_OBJ) $(SYM_OBJ)
+
+all: vhdl_test
+
+clean:
+	rm -f $(VHDL_OBJ) *.pdb *.sbr *.ilk *.exe *.opt *~
+
+doxygen:
+	$(DOXYPATH)\doxygen  $(DOXY_CONFIG)
+
+vhdl_test: vhdl_test$(EXE)
+
+vhdl_test$(EXE): $(VHDL_OBJ)
+	$(CC) $(VHDL_OBJ) $(DEBUG) $(EXCEPT) -o $*
+
+main\globals.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C
+	mv globals.$(OBJ) main
+
+main\main.$(OBJ):  $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C
+	mv main.$(OBJ) main
+
+mem\bigblock.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C
+	mv bigblock.$(OBJ) mem
+
+mem\blockpool.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C
+	mv blockpool.$(OBJ) mem
+
+skel\hash_serv.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C 
+	mv hash_serv.$(OBJ) skel
+
+skel\output.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C
+	mv output.$(OBJ) skel
+
+sym\strtable.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C 
+	mv strtable.$(OBJ) sym
+
+sym\sym.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C 
+	mv sym.$(OBJ) sym
+
+sym\type.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C 
+	mv type.$(OBJ) sym
+
+sym\typetable.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C
+	mv typetable.$(OBJ) sym
+
+sym\symtable.$(OBJ): $*.C
+	$(CC) -c $(INCLUDE) $(CFLAGS) $*.C
+	mv symtable.$(OBJ) sym

@@ -1,0 +1,187 @@
+2009-03-15  Stefan Jahn  <stefan@lkcc.org>
+
+	* register.cc (get_scope_registry_entry): Fixed segfault bug.
+
+2007-08-30  Stefan Jahn  <stefan@lkcc.org>
+
+	* main.cc: Fixed bug in memset() call; 2nd and 3rd arguments were
+	swapped.
+
+2006-07-18  Stefan Jahn  <stefan@lkcc.org>
+
+	* main.cc: Added -q command line argument to the simulation
+	binary in order to enable quiet mode.
+
+2006-04-27  Stefan Jahn  <stefan@lkcc.org>
+
+	* main.cc (time_conversion): Fixed a bug occurring when the time
+	grid (timescale + timeunit) is too small to represent the change
+	of a signal as an integer time value.
+
+2005-01-10   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* dump.cc: some signal names were not compatible with the VCD file
+	format. Fixed.
+
+2004-09-28   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* driver_info.cc: static declaration of members of a template
+	class must be prefixed with "template<>" (gcc >= 3.4).
+
+2004-07-14   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* the main function for the simulator is now compiled from the top
+	level component. The previous mechanism, which uses lists that are
+	initialized during simulator startup, has been abandoned due to
+	problems on other platforms.
+
+2004-02-09   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-class.cc: (kernel_class::elaborate_architecture): problem
+	with undriven out ports fixed.
+
+2003-12-20   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-sig-info.cc: fixed problem with ports that were
+	explicilty associated with "open".
+
+2003-02-6   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* global_event_queue.cc: extra token after #endif marked as
+	comment.
+
+2003-04-09  Marius Vollmer  <mvo@zagadka.de>
+
+	* error.cc: Replaced deprecated headers with modern ones.
+
+2003-02-6   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* persistent_cdfg_dump.cc
+	(get_cdfg_type_info_interface_definition): added code to handle
+	access and vhdl file types.
+
+	* register.cc: new function get_scope_registry_entry added. 
+
+	* register.cc (get_instance_long_name): code modified so that
+	function get_scope_registry_entry is used to lookup a scope
+	instead of just using get_registry_entry. This is necessary as the
+	first item defined in the entity class (= c++ class derived from
+	an entity) and the the corresponding class instance are having the
+	same memory address. Hence, both items cannot be separated just by
+	looking at the memory address.
+ 
+2003-01-3   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std-vhdl-types.hh, vhdl_types.cc (type_info_interface): method
+	"reset" to clear pointer for array_base and record_base instances
+	added.
+
+	* std-vhdl-types.hh (array_type::init): method extended to handle
+	array of records.
+
+	* map_list.cc (get_unconstrained_link_array_bounds): bug in
+	function to calculate array bounds from association fixed.
+
+2002-02-13   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* persistend_cdf_dump.cc (get_cdfg_type_info_interface_definition):
+	function now also handles record types.
+
+2002-02-12   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-map-list.hh, map_list.cc (signal_link::signal_link):
+	pointer to expressions are passed over as "const void *" to
+	signal_map.
+
+2002-01-31   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel_class.cc (kernel_class::init_generic): fixed missing
+	generic name in error message.
+
+2002-01-02   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* sigcal_list.cc: constructor must create an store a copy of the
+	acl instance parameter.
+
+	* kernel_class.cc, freehdl (kernel_class::compact_wait_elements): new
+	function to compact wait element lists addd.
+
+2001-11-02   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel_class.cc (sig_info_base::sig_info_base): problem with
+	mapping of arrays and/or records fixed.
+
+	* acl.cc (count_levels, get_level): bugs fixed.
+
+2001-10-31   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel_class.cc (kernel_class::elaborate_architecture): Fixed
+	problem with port signals (of mode out, inout or buffer) that are
+	sources for other signal(s) but are not driven by any process (or
+	other component).
+
+2001-10-24   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel_class.cc: Introduced a signal component stack which keeps
+	track of signals that are directly created within a
+	component. This data structure is required in order to create
+	signal sources.
+
+	* kernel_class.cc (kernel_class::elaborate_component): unit name
+	added to method interface (actually, not required but more
+	clean). Further, method now checks for valid default library and
+	unit parameters and calls corresponding architecture constructor.
+	
+2001-10-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* register.cc (init_funcs, register_init_func, run_init_funcs): New.
+
+	* main.cc (main): Call run_init_funcs before elaborating model.
+
+2001-10-13  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* kernel_class.cc (elaborate_component): Dummy implementation to
+	get leon to link.
+
+2001-10-10   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* driver_info.cc, vhdl_types.cc: functions to handle assignments
+	to record signals completed. Other assignment functions/methods
+	partially rewritten.
+	
+2001-10-03  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* kernel_class.cc (elaborate_configured_component): Commented out.
+
+2001-09-26   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel-driver-info.hh, driver_info.cc: dummy functions to handle
+	assignments to record signals added
+	
+2001-09-20   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std/vhdl_types.cc: record_info and record_base methods added
+	
+2001-09-20   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* driver_info.cc: bug in methods transport_assign and
+	inertial_assign for arrays fixed (broken out of range checking)
+	
+2001-02-08   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* kernel_class.cc: support for component instantiation 
+	via default binding added
+	
+2000-12-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* register.cc: Replaced "or" with "mor" throughout. "or" seems to
+	be a keyword in C++.  Thanks to Philippe Reynes!
+
+2000-09-04  Yu Zhang <zhang@ida.ing.tu-bs.de>
+	* stack_trace.cc (trace_source()): can convert the
+	generated C++ function names back to VHDL names.
+	
+2000-08-31  Yu Zhang <zhang@ida.ing.tu-bs.de>
+	
+	* stack_trace.cc (trace_source()): will also return
+	function names that are being called.

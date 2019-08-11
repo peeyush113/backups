@@ -1,0 +1,49 @@
+Hacking it yourself
+-------------------
+
+Here are some hints when you want to work with the sources from
+the FreeHDL CVS repository.
+
+* You need a couple of tools installed to compile this module.  The
+  versions should not be critical as FreeHDL does not make use of
+  advanced features of the tools.  Just use some reasonably recent
+  package.  The indicated versions are known to work.
+
+  - automake     1.7.0
+  - autoconf     2.57
+  - libtool      1.5
+  - bison        1.25
+  - flex         2.5.31
+  - guile        1.3.1
+
+  The final distribution tarball does not need these tools.
+
+* The repository contains only source files, that is, files that are
+  written and maintained by us humans.  Automatically generated files
+  are not checked in.  There is some controversy over this, but I
+  think for FreeHDL it is easier this way, because we can use slightly
+  different versions of the tools above and avoid constantly
+  overwriting each others generated files.
+
+  To `prime' a fresh checked out module, run "autogen.sh".  This is a
+  little script that will run automake, autoconf, libtool and their
+  various helpers.  If you want to return to a clean slate, run
+  "cleanit.sh".
+
+  You should not need to rerun autogen.sh when you have changed
+  configure.in or Makefile.am, etc.  The Makefile should have rules to
+  automatically regenerate all files.
+
+* Please adhere to the GNU Coding Standards.  Keeping detailed
+  ChangeLog entries is especially important.  The initial ChangeLog is
+  empty, unfortunately, but now that more people are working on the
+  sources, please provide ChangeLog entries.  If you are unsure how to
+  go about documenting your changes, please contact us.
+
+  I think it's generally a good idea to write ChangeLog entries first
+  and then automatically derive the CVS log messages from them.  The
+  Emacs program "pcl-cvs" has support for this.
+
+* Please document user visible changes in NEWS.
+
+Marius Vollmer <mvo@zagadka.de>

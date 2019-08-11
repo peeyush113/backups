@@ -1,0 +1,11 @@
+Major contributors:
+Marius Vollmer <mvo@zagadka.ping.de> (parser)
+Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de> (code generator/simulator)
+Said Mchaalia <said@ds.e-technik.uni-dortmund.de> (VCD dumper)
+David Colson <dscolson@rcn.com> (testing)
+Philippe <hensel@seul.org> (FHDLgui)
+Stefan Jahn <stefan@lkcc.org> (testing/maintenance)
+
+Special thanks to Ed Immenschuh for his great help in porting
+FreeHDL to different platforms and Dave Sullins for his 
+excellent work on the VHDL test suite!

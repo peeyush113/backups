@@ -1,0 +1,62 @@
+2007-08-30  Stefan Jahn  <stefan@lkcc.org>
+
+	* standard.cc (L3std_Q8standard_init): Fixed bug in memset() call;
+	2nd and 3rd arguments were swapped.
+
+2004-02-4 Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* standard.cc (report, internal_report): new function added to
+	handle report/assert statements without any report message.
+
+2003-07-27  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* standard.cc (attribute_image): new function adds support for
+	attribute image.
+
+	* standard.cc (attribute_value): new function adds support for
+	attribute value.
+ 	
+2003-04-10  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* vhdl_types.cc (internal_alloc): cast added to get rid of
+	warinings during compilation.
+
+	* vhdl_types.cc (record_info::vcd_print): missign reference
+	operation added.
+ 	
+2003-04-09  Marius Vollmer  <mvo@zagadka.de>
+
+	* vhdl_types.cc: Explicitely cast to 'char *' where required.
+
+2003-02-6  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* vhdl_types.cc (record_info::clone): use method init to
+	initialize record elements that are not local.
+ 	
+2002-01-13  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* vhdl_types.cc (array_info::copy, array_info::clone):
+	initialize memory allocated for array elements.
+ 	
+2001-12-18  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std/vhdl_types.cc (array_info::init): initialize memory
+	allocated for array elements if element type is non scalar.
+ 	
+2001-12-16  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* internal_textio.cc (L3std_Q6textio_X8readline_i31,
+	L3std_Q6textio_X9writeline_i90): Removed "const" qualifier.
+
+	* textio.vhdl (readline, writeline): F parameter is now
+	explicitly of class file.
+
+2001-10-14  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* std/vhdl_types.cc (record_info::copy, record_info::clone):
+	bug fixed.
+	
+2001-09-17  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* std/standard.vhdl (INTEGER, TIME, DELAY_LENGTH): More correct
+	ranges.  Also see comment for further issues.

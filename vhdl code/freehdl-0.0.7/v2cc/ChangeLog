@@ -1,0 +1,657 @@
+2009-04-20  Stefan Jahn  <stefan@lkcc.org>
+
+	* gvhdl.in (main): Using ESTREAM to output error messages on
+	STDERR.
+
+2008-02-15  Stefan Jahn  <stefan@lkcc.org>
+
+	* gvhdl.in: Removed freehdl-libtool dependency, using system
+	libtool.
+
+	* v2cc-util.cc: Fixed some compile issues with the g++ 4.3
+	version.
+
+2007-10-23  Stefan Jahn  <stefan@lkcc.org>
+
+	* v2cc-util.cc: Loads of changes in many files to avoid the g++
+	4.2 warning: "deprecated conversion from string constant to
+	'char*'".
+
+2005-12-14  Stefan Jahn  <stefan@lkcc.org>
+
+	* v2cc.cc: Surrounded #include <malloc.h> with a HAVE_MALLOC_H
+	wherever needed.  For MacOS systems.
+
+2004-11-29   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-expr.cc (init_array_operator_macros): names of some array
+	operators corrected.
+
+	* gvhdl: search path for includes is now set correctly.
+
+	* v2cc-decl.cc (m_emit_hdr): problem with arrays, where an element
+	is an array subtype, fixed.
+
+	* v2cc-impl.cc: (emit_decls_init_item): problem with alias fixed.
+
+	* v2cc-expr.cc: (init_user_operator_names): macros for shift
+	operators added.
+
+	* v2cc-expr.cc: (init_array_operator_macros): macros for shift
+	operators added.
+
+2004-11-18   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc.cc (emit): code to check for overwritten library units
+	added.
+ 
+2004-11-16   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc (emit_impl): return in procedures were not handled
+	correctly.
+
+	* v2cc-impl.cc (emit_impl): problem with loops fixed. Now, a
+	counter is used to count the number of loop iterations.
+ 
+2004-11-09   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc (emit_impl): problem with enumeration loops fixed.
+
+2004-7-26   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* gvhdl: libtool is now executed with option "--mode=link".
+
+2004-7-22   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc.cc (main): Name of vhdl source file was not correctly
+	determined in case of CDFG code shall be generated.
+
+2004-7-21   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc (explore_and_check): The base type and the
+	resolution function were not checked for each subtype. Problem
+	fixed.
+
+2004-7-20   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-decl.cc (make_absolute): getcwd was called with the first
+	parameter set to NULL. According to the man pages this is not
+	permitted. Fixed.
+
+2004-04-28  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+
+	* v2cc-chunk.t (emit_impl), v2cc-impl.cc (m_emit_impl): Added
+	IIR_RecordSubtype.
+
+2004-2-5   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-util.cc (get_combined_static_region): problem with
+	incorrect combined static region fixed.
+
+	* v2cc-impl.cc (m_emit_info_init): problem with multi-dimensional
+	arrays fixed.
+
+	* v2cc-get-type-info.cc (m_get_type_info_obj): problem with
+	multi-dimensional arrays fixed.
+
+2004-2-4   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc (m_check_expression): static declarative region
+	for plain function call expressions is set to current active
+	declarative region.
+
+	* v2cc-util.cc (create_region_list): the predecessor region of an
+	architecture is the corresponding entity declaration.
+
+	* v2cc-const-fold.cc (m_constant_fold): bug in function to
+	calculate power fixed.
+
+	* v2cc-impl.cc (m_emit_impl): problem with report/assert
+	statements that do not print any message string fixed.
+
+2003-12-20   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc (emit_plain_subprogram_impl): problem with
+	composite inout subprogram parameters fixed.
+		
+2003-12-12   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-delc.cc (m_emit_hdr): typo in generated code fixed.
+		
+	* v2cc-explore.cc (m_explore_and_check): error message is
+	generated if initial value of an object declared in a concurrent
+	declarative region contains signals.
+
+	* v2cc-chunk.t, v2cc-explore.cc (m_get_context): new generic
+	methods added to handle get_context calls on IIR_AttrTypeFunc,
+	IIR_AttrTypeValue and IIR_AttrArrayFunc.
+
+	* v2cc-expr.cc (m_emit_expr): additional casting to target type is
+	now generated in case of predefined operators / and * where type
+	of left and right operand is different.
+	
+2003-12-12   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-util.hh, v2cc.h, v2cc-const-fold.cc, v2cc-expr.cc: handling
+	of literals (integer, reals, array literals) modified. Now, for
+	plain real literals (with default base) the original string
+	(without '_' separators) is stored along with the converted double
+	number. If this string is available, it is printed to the cc
+	file. Otherwise, the double value is printed with max
+	precision. In order to do so, class StaticDataType has been
+	re-written.
+
+	* v2cc-qid.cc (m_qid): generic method should return "vhdlaccess"
+	as VHDL pointer type.
+ 	
+2003-08-01   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-util.hh, v2cc-explore.cc, v2cc-const-fold.cc (lint_abs):
+	function to calculate absolute value for along long int
+	parameter. Can be replaced with library function llabs as soon as
+	it compiles with gcc3.
+
+2003-07-27   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-expr.cc (m_emit_expr): support for attributes image and
+	value added.
+
+2003-07-20   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc (m_emit_impl): bug in generated code for "delayed"
+	subprograms fixed.
+
+2003-07-18   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-decl.cc (emit_delayed_procedure_constructor): problem with
+	signal parameters of delayed procedures (i.e., procedure which
+	contain wait statements fixed).
+
+2003-07-08   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc, v2cc-decl.cc: added support for procedures with
+	wait statements.
+
+2003-06-13   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc: explore_and_check now checks out whether a
+	process with sensitivity list calls procedures that contain
+	waits.
+
+2003-04-10   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-util.h (calculate_pow): new function for arguments (double,
+	double) added.
+
+	* v2cc-expr.cc (init_operator_macros): translated operator name
+	for predefined operation abs renamed to op_abs.
+
+	* v2cc-explore.cc (m_get_context): did not return a pointer to an
+	access descriptor if applied on an function call. Fixed.
+	
+2003-04-09  Marius Vollmer  <mvo@zagadka.de>
+
+	* v2cc-util.cc: Removed default values for parameters in function
+	definitions.
+
+	* v2cc-explore.cc (m_check_expression): Added cast so that the
+	correct min version is selected.
+	(check_association): Added cast for unknown reasons, but it works.
+
+	* mapping.cc, v2cc-explore.cc, v2cc-util.h, v2cc.cc, v2cc.h:
+	Replaced deprecated headers with modern ones.  Namespace games for
+	GCC 3.
+
+2003-02-10   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-cdfg-expr.cc (m_cdfg_emit_expr): additional quotes in lisp
+	code removed.
+
+2003-02-06   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-cdfg-impl.cc (cdfg_emit_impl): added check for empty
+	sequence_of_statements slot.
+
+2003-02-04   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc (emit_generic_map): problem with actual subtypes
+	that point to "universal integer". Now, formal subtype is used
+	instead as it will never point to "universal integer".
+
+	* v2cc-impl.cc (emit_signal_map): actuals of type
+	IR_OPEN_EXPRESSION were not handled correctly.
+	
+	* v2cc-delc.cc (cleanup_external_declaration_list): new function
+	to remove entries from the external declaration list that should
+	not be included into the output cc file. This function is called
+	after the external_declaration list is generated.
+
+	* v2cc-impl.cc (m_emit_impl): in generated C++ code VHDL labels
+	were printed. Actually, this is not necessary.
+ 	
+2003-02-03   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc (explore_and_check): information about signal
+	parameters of subprogram calls were not recorded correctly.
+	
+2003-01-03   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc (explore_and_check): function extended to check
+	individual associations for generics.
+	
+2003-01-02   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc (check_association): function extended to check
+	individual associations.
+
+	* v2cc.h (StaticRangeDescriptor_lint_Less): compare class extended
+	so that it now also returns true for a < b (a , b are ranges) if
+	the lower bound of a and b are the same but the higher bound of a
+	is less then that of b.
+
+	* v2cc.c (RangeDescriptor::rangedes_to_???): methods return
+	invalid valid vector. Fixed.
+	
+2002-10-02   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* nearly all files affected: new structure StaticRangeDescriptor
+	added. method rangedes_to_??? modified so that they return a
+	StaticRangeDescriptor.
+ 
+2002-02-13   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-cdfg-expr.cc: calls to emit_expr replaced with
+	cdfg_emit_expr.
+
+	* v2cc-impl.cc (emit_signal_map) : Now also handles individual
+	association of formals.
+ 	
+2002-02-12   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc (emit_signal_map_pars) : New, function determines
+	parameter string which is passed over to signal_map during
+	elaboration. Calls to get_object function replaced by calls to
+	generic function get_context.
+
+	* v2cc-impl.cc (emit_signal_map) : Now also handles individual
+	association of formals.
+ 	
+2002-01-31   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-util.h (get_parent_declarative_region) : New, function
+	determines parent declarative region of a given region. 
+ 	
+	* v2cc-explore.cc (max_inner): problem with finding parent region
+	of an entity declaration fixed.
+
+2001-12-16  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-decl.cc (emit_subprogram_prototype): Handle
+	IR_FILE_INTERFACE_DECLARATIONs like
+	IR_VARIABLE_INTERFACE_DECLARATIONs instead of signaling an error.
+
+	* v2cc-impl.cc (emit_subprogram_associations): Removed unused
+	clause for IR_FILE_INTERFACE_DECLARATIONs.
+
+	* v2cc.cc (mypool::get): Only output dependency when design unit
+	has been read successfully.
+	(main): Only output generated code when there have been no errors.
+	
+2001-12-15   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc (m_emit_impl::IIR_ProcessStatement): prevent
+	process constructor from adding signals more than once to the
+	sensitivity list.
+
+2001-12-07   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-const-fold.cc (m_constant_fold): generic function
+	constant_fold removed for type pIIR_EntityDeclaration (not used).
+
+2001-11-14   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc (get_object): interface variable "or" renamed to
+	"oref" ("or" is a keyword).
+
+2001-11-01  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* v2cc-impl.cc (get_object, emit_signal_map): New.
+	(emit_component_instantiation): Use it.
+
+2001-10-30   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-expr.cc (m_emit_expr): bug in type conversion fixed (a
+	floating point value must be rounded to the nearest integer when
+	it is converted to an integer).
+
+2001-10-24   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc.cc: option "allow-invisible-default-bindings-from-work"
+	changed to "relaxed-component-visibility".
+
+2001-10-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-decl.cc (emit_init_func): New, emits common part of init
+	functions and also calls init functions of units that the current
+	one depends on.
+	(m_emit_decl:IIR_PackageDeclaration,
+	m_emit_decl:IIR_PackageBodyDeclaration,
+	m_emit_decl:IIR_EntityDeclaration,
+	m_emit_decl:IIR_ArchitectureDeclaration,
+	m_emit_decl:IIR_ConfigurationDeclaration): Use it.
+	
+	* v2cc-const-fold.cc (m_constant_fold:IIR_AttrTypeFunc): Check
+	base type of prefix instead of prefix itself when determing what
+	kind of type it is.
+	
+2001-10-08  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc.cc: Only log VHDL files read and design units emitted when
+	being verbose.
+
+	* v2cc-qid.cc (m_qid:IIR_TypeDeclaration): Add access prefix when
+	the INFO object should be returned.
+
+	* v2cc-impl.cc (emit_component_instantiation): Correct change from
+	2001-10-04.  Handle "open" associations by using the appropriate
+	signal_map function.
+	(emit_concurrent_statement_constructors): Do not prepend a access
+	prefix to the loop variable name for generate statements.
+	
+
+	* v2cc-chunk.t (pIIR_Root, pIIR_Expression, pIIR_InterfaceList,
+	pIIR_DeclarativeRegion, pIIR_DeclarationList,
+	pIIR_SubtypeDeclaration, pV2CC_ImplicitSubtypeDeclaration,
+	pV2CC_ImplicitInterfaceSubtypeDeclaration): Removed.  Replaced all
+	uses with the corresponding node types.  Using a ctype instead of
+	a node type fools the garbage collector.  Ctypes are not traced.
+
+	* v2cc-decl.cc (m_emit_decl): Also check and explore the external
+	declarations of IIR_LibraryUnits.  Without this, the
+	extended_interface_declarations of subprograms are not computed and
+	the prototype is wrong, for example.
+	
+2001-10-04  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-impl.cc (emit_component_instantiation): Handle "open"
+	associations by passing NULL to signal_map.  Probably not correct.
+
+	* v2cc-explore.cc (max_inner): New.
+	(m_explore_and_check:IIR_DeclarationList): For a
+	constant declaration, determine static_declarative_region by also
+	considering the subtype in addition to the initial value.
+
+2001-10-03  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-explore.cc
+	(m_explore_and_check:IIR_ComponentInstantiationStatement):
+	Commented out check for default binding.
+
+	* v2cc-impl.cc (emit_component_instantiation): Handle
+	instantiation of configurations and components without default
+	bindings.
+
+	* v2cc-decl.cc, v2cc-explore.cc, v2cc.h (decl_pointer_bool_map,
+	decl_flag_list): Renamed decl_pointer_bool_map to decl_flag_list
+	and made it a list of pairs.  It needs to be ordered, but `map's
+	are not.  Changed all uses.
+
+	* v2cc-decl.cc, v2cc-explore.cc, v2cc-util.h (external_decls_map,
+	external_decls_list): Renamed former to latter.  Changed all uses.
+
+	* v2cc-util.cc (find_decl_in_list): New.
+	(merge:IIR_Type): Use it.  Also, append new types to the end of
+	the list.
+	(merge:IIR_Type): Likewise, for declarations.  Also, merge the
+	subtype of object declarations.
+
+
+2001-09-30  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-decl.cc (make_absolute): Insert a `/' between the cwd and
+	the file name.
+
+	* v2cc-impl.cc (m_emit_impl:IIR_ScalarSubtype): Emit
+	initialization code for the the static tables of a primary
+	physical subtype.
+
+	* v2cc-expr.cc (m_emit_expr:IIR_RecordReference): Emit ".value()"
+	instead fo ".data" to get at the record elements.
+
+	* v2cc-decl.cc (emit_external_decls): Do not use
+	`get_design_file_name', it is not reliable.  Use
+	`get_source_file_name' instead.
+	(m_emit_hdr:IIR_ScalarSubtype): Emit unit and scale tables for the
+	primary subtype of a physical type as static members of the type
+	info structure.
+
+2001-09-29  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-const-fold.cc (m_constant_fold:IIR_PhysicalType): The
+	primary unit has a NULL multiplier, don't fold it.
+	(m_constant_fold:IIR_AbstractLiteralExpression): Also handle
+	floating point literals.
+
+	* v2cc-expr.cc (m_emit_expr:IIR_AbstractLiteralExpression): Handle
+	constant folded integer and floating point literals.  This ensures
+	that VHDL literals are properly translated to C++ literals.
+
+2001-09-26   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-util.cc: function check_assignment changed to function
+	check_for_target_type. This function now checks whether an
+	expression matches a specific type. Calls to check_assignment has
+	been modified to match the new function prototype.
+
+	* v2cc-explore.cc: generic functions to check record aggregates
+	added.
+
+	* v2cc-const-fold.cc: constant folding for records added.
+ 	
+2001-09-25   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc: problem with static_declarative_region - not
+	set correctly in some cases - fixed.
+	
+2001-09-23  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-util.cc (string_to_ulint): Make `result' a reference
+	parameter.
+	(string_to_li): Check for and pass over final '#' in based
+	literals.
+	(string_to_d): Likewise.
+
+	* v2cc.h (mypool): Added dependencies_file member.
+	* v2cc.c (mypool::get): When dependencies_file is set, write all
+	read files to it.
+	(main): Handle new "--depend" option.  Use strdup when storing
+	away the generated_cc_file_name.
+
+	* v2cc-chunk.t, v2cc-explore.cc (get_static_level): Only add
+	methods for IIR_Type and IIR_Expression.  Static level handling is
+	now done by the front end.
+
+2001-09-17  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-util.cc (merge): Do not merge sub-types of types that are
+	already found in the map.
+	(check_assignment): Handle records by ignoring them.
+
+	* v2cc-impl.cc (m_emit_impl:IIR_WaitStatement): Assert that the
+	filter operation for V2cc_Implicitsignaldeclaration_Waitfor did
+	not return an empty list.
+
+	* v2cc-expr.cc (m_emit_expr:IIR_AttrSigFunc): Handle `last_event'
+	attribute.  There is no support from the kernel yet, however.
+
+	* v2cc-explore.cc (m_explore_and_check:IIR_SubprogramDeclaration):
+	Add V2cc_Implicitsignaldeclaration_Waitfor nodes to the
+	extended_declarations list of the IIR_SubprogramDeclaration node.
+	(m_explore_and_check:IIR_RecordType): Do not set the
+	static_declarative_region of the record type to anything other
+	than the RootDeclarativeRegion, yet.  It wouldn't work but some
+	record types can be handled on the root level although their
+	element types are not locally static.
+	(m_get_context:IIR_AccessReference): Return the value returned by
+	the `get_context' of the `access' expression.
+	(m_get_static_level:IIR_RecordSubtype,
+	m_get_static_level:IIR_RecordType): New.
+	(m_get_static_level:IIR_AccessType): Always return
+	IR_LOCALLY_STATIC, as per LRM.
+	
+	* v2cc-decl.cc (emit_subprogram_prototype): Handle
+	V2CC_ImplicitSignalDeclaration_WaitFor objects by giving them a
+	type of "enumeration".
+
+	* v2cc-const-fold.cc (m_constant_fold:IIR_PhysicalLiteral): Allow
+	inaccuracies when scaling the unit by a floating number.
+
+	* v2cc-chunk.t (get_static_level): Added methods for
+	IIR_RecordType and IIR_RecordSubtype.
+
+2001-09-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-explore.cc (m_explore_and_check:IIR_RecordType): Put it
+	into the right static_declarative_region, depending on where the
+	types of its elements are.
+
+	* v2cc-impl.cc (m_emit_impl:IIR_RecordType,
+	m_emit_info_init:IIR_RecordType): Initialize TYPE array via a
+	function to avoid implicit global constructors.
+
+	* v2cc-util.cc (nid): Handle IIR_ElementDeclarations by giving
+	them an "M".
+	(merge): Handle IIR_RecordTypes by also merging their element
+	types.
+
+	* v2cc-impl.cc (emit_concurrent_statement_constructors): Emit an
+	additional ",level" for constructors of `if' generate statements.
+
+	* v2cc-const-fold.cc (m_constant_fold): Handle constants
+	initialized with a array literal.
+
+	* v2cc-impl.cc, v2cc-get-type-info.cc, v2cc-explore.cc,
+	v2cc-decl.cc, v2cc-chunk.t (emit_hdr, emit_impl, emit_info_init,
+	explore_and_check, get_type_info): Added IIR_RecordType.
+	(get_acl): Added IIR_RecordReference.  Added appropriate method
+	implementations for the above.
+
+	* v2cc-expr.cc (m_emit_expr:IIR_RecordReference): Emit access to
+	members of "data" instead of direct members.
+	(m_emit_expr:IIR_RecordAggregate): Emit valid code instead of
+	pseudo code.
+	
+2001-09-05  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc.cc: Use new vaul_parser_options instead of parser flags.
+	(main): Use getopt_long instead of getopt.  Added first long
+	option "allow-invisible-default-bindings-from-work".
+	
+2001-08-10   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc, v2cc-impl.cc: problem with empty
+	loop bodies and empty case alternatives fixed
+	
+2001-08-09   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc.cc: bug constant folding of range attribute 
+	'reverse_range fixed
+	
+2001-08-01   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-const-fold.cc: bug in constant folding of physical literal
+	constants fixed
+	
+2001-06-05   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-explore.cc: types and initial values of component
+	declarations are analyzed
+	
+2001-04-03   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-cdfg-expr.cc, v2cc-cdfg-static-expr.cc, v2cc-cdfg-impl.cc:
+	new files needed to support CDFG (control data flow graph) 
+	generation
+	
+2001-03-29   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-util.cc: function range_to_length fixed
+	
+2001-02-27   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc: for loop bug fixed
+	
+2001-02-21   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-util.cc: missing return statements in get_basic_type
+	added
+	
+2001-02-20   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-decl.cc: declaration in package std.textio are now 
+	handled	like normal package declarations
+	
+2001-02-15   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-decl.cc: implicit function "endfile" is now declared 
+	correctly
+	
+2001-02-08   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc: support for component instantiation 
+	via default binding added
+	
+2001-02-05  Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* v2cc-impl.cc, v2cc-decl.cc: implicit integer, floating point,
+	physical subtypes implemented.
+	
+2001-01-22  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-chunk.t (IR_StaticLevel): Removed.
+
+2001-01-25  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* test-mapper.cc: Include <stdlib.h> to get a prototype for
+	`exit'.
+
+2001-01-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-chunk.t, v2cc-decl.cc, v2cc-explore.cc, v2cc.cc: Replaced
+	VAUL_PredefOp with IIR_PredefinedFunctionDeclaration everywhere.
+
+2001-01-06  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-explore.cc, v2cc-impl.cc: Adapted to changed node slots.
+
+2000-12-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc-util.cc (plot_rstack): Arbitrarily return 0. Replaced "or"
+	with "mor" throughout. "or" seems to be a keyword in C++.  Thanks
+	to Philippe Reynes!
+	
+	* v2cc-decl.cc, v2cc-impl.cc: Name space hygiene.
+
+2000-09-22  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2cc.cc (mypool::get): Pass VAUL_PARSER_SKIP_BODIES flag into
+	design file.
+
+	* mapping.cc: Commented out debugging messages.
+
+2000-08-10  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* Reorganized names of Attribute nodes.  Changed all references.
+
+2000-03-31  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* v2cc.cc (dry_run): New.
+	(main): Set dry_run when passed the "-n" option.
+	(emit): Do not emit code when dry_run is true.
+	
+2000-02-07  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* Makefile.am, v2cc-chunk.t: Get vaul-chunk.t from freehdl/.  Pass
+	suitable "-I" option to gen-nodes.
+

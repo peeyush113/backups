@@ -1,0 +1,29 @@
+2004-01-29  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* math_real.vhdl: New.
+	
+	* Makefile.am: Added math_real.vhdl in all the right places.
+	(EXTRA_DIST): Just use ieee_DATA instead of listing all files
+	individually.
+	
+2001-10-13  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* Makefile.am (libieee_la_SOURCES): Added std_logic_signed,
+	std_logic_unsigned and std_logic_arith.
+
+2001-09-23  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* Makefile.am: Build libieee as a libtool library.  Install
+	libieee and VHDL files.
+
+2000-12-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* Makefile.am: Added dependencies of the built sources on
+	freehdl-v2cc.
+
+2000-11-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* ieee/Makefile.am: Do not use gvhdl for compiling vhdl files.
+	Use freehdl-v2cc directly, this makes it work with vpath builds.
+	(BUILT_SOURCES, CLEANFILES, INCLUDES): Added to support above
+	change.

@@ -1,0 +1,4740 @@
+This is fire.info, produced by makeinfo version 4.13 from fire.texi.
+
+INFO-DIR-SECTION Programming
+START-INFO-DIR-ENTRY
+* FIRE: (fire).                The FIRE Reference Manual.
+END-INFO-DIR-ENTRY
+
+
+File: fire.info,  Node: Top,  Up: (dir)
+
+The libfire library
+*******************
+
+The libfire library provides "FIRE", the Feeble Intermediate
+Representation with Extensibility.
+
+* Menu:
+
+* Introduction::
+* Using gen-nodes::
+* Using the Generated Code::
+* FIRE Reference::
+
+
+File: fire.info,  Node: Introduction,  Next: Using gen-nodes,  Prev: Top,  Up: Top
+
+1 Introduction
+**************
+
+This library provides "FIRE", the Feeble Intermediate Representation
+with Extensibility.
+
+   Additionally, it provides general support for working with "abstract
+syntax trees".  It implements a precise view of what such an abstract
+syntax tree really is and it has facilities for dealing with it
+efficiently.
+
+   Abstract syntax trees are often used as an intermediate
+representation in compilers or other language processing tools.  They
+are built while analyzing the original source text and have the same
+meaning as the source text, but in a form that is more suited to be
+dealt with by programs.
+
+   When you are working with the raw source of a program you have to
+deal with such `unimportant' issues as where an identifier starts in
+the file and where it ends, whether there are parentheses around this
+expression, or to which declaration an identifier really refers.
+Syntax trees are used to `abstract away' most of this issues.
+
+   The libfire library is written in C++.  That means that you can
+probably only use it from C++.  It should not be overly difficult to
+also provide a C interface to FIRE, so if you want it, be sure to tell
+me(1).
+
+   For the rest of this chapter, we will develop a more or less complete
+example of a simple abstract syntax tree.  If you already have a general
+idea of what such a thing is, you might still want to read it, as it
+also introduces such things a "double dispatch" and "generic
+functions", plus some motivation for them.
+
+   The `gen-nodes' tool builts on the principles outlined in the
+example, and in turn, FIRE builds on `gen-nodes'.
+
+   For the example, suppose you want to write a little program that can
+compute the derivative of simple arithmetic expressions.  A typical use
+of the program might look like this:
+
+     2*x+3
+     => 2
+
+   Here the user types the expression `2*x+3' and the program answeres
+`2', which is the derivative of `2*x+3' with respect to `x'.
+
+* Menu:
+
+* Types::
+* Operations::
+* Extending::
+* New Types::
+
+   ---------- Footnotes ----------
+
+   (1) <mvo@zagadka.ping.de>
+
+
+File: fire.info,  Node: Types,  Next: Operations,  Up: Introduction
+
+1.1 The Data Types
+==================
+
+Because the program wants to work on the expressions in a convenient
+way, we have to transform the input-which simply consists of a sequence
+of characters-into an internal, intermediate form.  To do this, we
+define a data structure for every kind of thing that can appear in the
+input.  To keep things simple, we restrict us here to: constants,
+variables and binary operations(1).  Here are the data structures, in
+all their glory.  They are somewhat circular, so it's probably best to
+show them all at once; explanations are below.
+
+     struct expression {
+     };
+
+     struct constant : expression {
+       double value;
+
+       constant (double value)
+        : value (value)
+       { }
+     };
+
+     struct variable : expression {
+       char *id;
+
+       variable (char *id)
+        : id (id)
+       { }
+     };
+
+     struct binop : expression {
+       char op;
+       expression *left;
+       expression *right;
+
+       binop (char op, expression *left, expression *right)
+        : op (op),
+          left (left),
+          right (right)
+       { }
+     };
+
+   As you can see, there is some redundancy in the code.  We have only
+four data structures here, but the real FIRE contains some 200 of them
+and we will encounter more cases of `boilerplate' code in the course of
+this example.  Not all is lost, tho.  As will later be explained, there
+are mechanisms in place that help you generate much of this code
+automatically from a higher level description.
+
+   We use inheritance to express the relations between the structures.
+The three `interesting' structures are derived from a common base type,
+`expression'.  This allows us to treat all three structure types the
+same when we don't know or care what specific type really is at hand.
+For example, the `binop' structure contains pointers to structures that
+represent the left and right operands, respectively.  All we can say
+about these operands is that they are expressions, we don't know
+beforehand whether they are constants, variables or another binary
+operation.  Consequently, all we can do in the `binop' structure is to
+declare pointers to the common base class `expression'.
+
+   Returning to the example expression from above, how would we
+represent `2*x+3' with these data structures?  The following piece of
+code would construct a suitable net of objects.
+
+     expression *
+     build_sample_expression ()
+     {
+       return new binop ('+',
+                         new binop ('*',
+                                    new constant (2),
+                                    new variable ("x")),
+                         new constant (3));
+     }
+
+   Note how the explicit nesting of the `new' expressions reflects the
+implicit nesting in the original expression.  In effect, the precedence
+rules of arithmetic expressions (multiply before add) have been
+abstracted out.  We no longer need to know these rules to decide how to
+pair sub-expressions because the pointers of the `binop' structure tell
+the story very clearly.
+
+   Of course, the resulting data structure is some kind of _tree_,
+which represents information that were originally contained in some form
+of _syntax_, and some details of this syntax have been _abstracted_
+away.  That's why they are called _abstract syntax trees_.
+
+   The individual data objects (instances of the structure types) that
+form such a tree are called its "nodes".  To distinguish the structure
+types of these node objects from other types that are not directly
+related to the syntax tree data structure, we will call them "node
+types" in the following.  Thus, `expression', `constant', `variable'
+and `binop' are node types, while the thing returned by
+`build_sample_expression' is a node (that has pointers to other nodes).
+While we are at it, the precise type of a node is often called its
+"kind".  Thus, the kind of the node returned by
+`build_sample_expression' is `binop'.
+
+   Now that the intermediate representation for our program is
+sufficiently defined, we need a way to get from the textual input to an
+equivalent abstract syntax tree.  This is the job of the "parser".  The
+parser is responsible for taking the input apart, deciding which part
+of it means what, and putting together a corresponding abstract syntax
+tree.  The process of doing so is full of difficult decisions that
+require a carefully crafted set of rules (the grammar) and some serious
+looking around in the input text.  Even for such simple things as
+arithmetic expressions, writing a parser makes the need for a
+sufficiently abstract data structure clear.  You will only want to
+write the parser once, all other parts of the program are better off
+working with the abstract syntax tree.
+
+   We wont show the parser here, because it would probably be too
+complicated and give too little insight into the topic of this manual.
+In fact, libfire itself does not contain a parser for turning VHDL into
+FIRE.  This is the job of another, altogether much more complicated
+library.
+
+   ---------- Footnotes ----------
+
+   (1) _Binary_ here means `with two operands', not `operating on bits'
+
+
+File: fire.info,  Node: Operations,  Next: Extending,  Prev: Types,  Up: Introduction
+
+1.2 Performing Opertions on the Types
+=====================================
+
+Instead of looking at parsing techniques, let's see how we can work with
+an existing tree.  Our simple derivation program will want to output
+arbitrary expressions.  Naturally these expressions will be computed
+from the input expressions, by use of the node types above.  So we need
+a way to turn an abstract syntax tree back into it's textual form.  This
+is much simpler than the other way round.
+
+   We need to do different things depending on the kind of the node
+that we want to output.  The vehicle of choice for doing this run-time
+type dispatch in C++ is the virtul function, of course.  So let's add
+one to our node type definitions.
+
+     #include <iostream.h>
+
+     struct expression {
+       ...
+       virtual ostream& operator<< (ostream& o) = 0;
+     };
+
+     struct constant : expression {
+       ...
+       virtual ostream& operator<< (ostream& o)
+       {
+         return o << value;
+       }
+     };
+
+     struct variable : expression {
+       ...
+       virtual ostream& operator<< (ostream& o)
+       {
+         return o << id;
+       }
+     };
+
+     struct binop : expression {
+       ...
+       virtual ostream& operator<< (ostream& o)
+       {
+         return o << "(" << left << op << right << ")";
+       }
+     };
+
+   Unfortunately, using virtual functions in a straightforward way
+results in a lot of accumulated `cruft' in the structure definitions.
+For each new operation that we want to define, we have to modify the
+definitions of the node types.  This might be acceptable for a small,
+monolithic application, but it does not work for a library of
+predefined node types like libfire.  We would have to anticipate all
+possible virtual functions that all users of the library might want to
+have.
+
+   But the number of useful operations that can be performed on a data
+structure is effectively unlimited.  It would be nice to somehow
+decouple the virtual functions that are used to implement the operations
+from the definition of the data structures that they work on.
+
+   There is a well known trick to achieve this: "double dispatch", also
+known as the Visitor pattern.
+
+   Instead of adding a new virtual function to the node types for every
+operation that wants to do run-time dispatching, we try to add only a
+single, generic one that we can then reuse.
+
+   Here is all the code needed to implement this idea.  The details from
+the previous section have been omitted for clarity.
+
+     struct constant;
+     struct variable;
+     struct binop;
+
+     struct visitor {
+       void visit_constant (constant *c) = 0;
+       void visit_variable (variable *v) = 0;
+       void visit_binop (binop *b) = 0;
+     };
+
+     struct expression {
+       ...
+       virtual void dispatch (visitor *v) = 0;
+     };
+
+
+     struct constant : expression {
+       ...
+       virtual void dispatch (visitor *v)
+       {
+         v->visit_constant (this);
+       }
+     };
+
+     struct variable : expression {
+       ...
+       virtual void dispatch (visitor *v)
+       {
+         v->visit_variable (this);
+       }
+     };
+
+     struct binop : expression {
+       ...
+       virtual void dispatch (visitor *v)
+       {
+         v->visit_binop (this);
+       }
+     };
+
+   Now, when we want to implement a new function that has to do
+different things depending on the type of some node, we can just use the
+`visitor' class as an trampoline.  We derive a new class from `visitor'
+and then invoke the `dispatch' member function of the node we want to
+dispatch on with an instance of our new class.
+
+   For example, the printing routine could be implemented thusly:
+
+     ostream& operator<< (ostream&, expression *e);
+
+     struct print_visitor : visitor {
+       ostream &o;
+       ostream &result;
+
+       void visit_constant (constant *c)
+       {
+         result = o << c->value;
+       }
+
+       void visit_variable (variable *v)
+       {
+         result = o << v->variable;
+       }
+
+       void visit_binop (binop *b)
+       {
+         result = o << "(" << b-left << b->op << b->right << ")";
+       }
+     };
+
+     ostream&
+     operator<< (ostream &o, expression *e)
+     {
+       print_visitor v;
+       v.o = o;
+       e->dispatch (&v);
+       return v.result;
+     }
+
+   This does what we want, but something is still missing.  First, the
+need to marshall the arguments and the return value of the function
+thru the `print_visitor' class is awkward.  But it is the best we can
+do, since we have to tunnel the flow of control thru the `dispatch' and
+`visit_*' functions.
+
+   This is another case of `boilerplate' code.  To enable it to be
+automatically generated, we separate the pieces that must be written by
+us humans from the pieces that can readily be generated.
+
+   For the `print_visitor' from above, the hand written code consists
+only of the bodies of the `visit_*' functions.  We cn separate the code
+as follows:
+
+     // hand written
+
+     ostream &operator<< (ostream &o, expression *e)
+     {
+       return print (e, o);
+     }
+
+     ostream &m_print (constant *c, ostream &o)
+     {
+       return o << c->value;
+     }
+
+     ostream &m_print (variable *v, ostream &o)
+     {
+       return o << v->variable;
+     }
+
+     ostream &m_print (binop *b, ostream &o)
+     {
+       return o << "(" << b-left << b->op << b->right << ")";
+     }
+
+     // automatically generated
+
+     struct print_visitor : visitor {
+       ostream &o;
+       ostream &result;
+
+       void visit_constant (constant *c)
+       {
+         result = m_print (c, o);
+       }
+
+       void visit_variable (variable *v)
+       {
+         result = m_print (v, o);
+       }
+
+       void visit_binop (binop *b)
+       {
+         result = m_print (b, o);
+       }
+     };
+
+     ostream&
+     print (expression *e, ostream &o)
+     {
+       print_visitor v;
+       v.o = o;
+       e->dispatch (&v);
+       return v.result;
+     }
+
+   Now, this looks much better.  What we have now are essentially
+virtual functions that are _not_ members of the class that they are
+defined for.  This is much like the thing that Common Lisp calls
+"generic functions", so we call our imitation the same.  The function
+`print' in the example above is such a generic function.  The
+individual functions that implement the desired functionality for every
+node type are called "methods" of a generic function.  The set of
+functions named `m_print' are the methods of the generic function
+`print'.
+
+
+File: fire.info,  Node: Extending,  Next: New Types,  Prev: Operations,  Up: Introduction
+
+1.3 Extending the Node Types
+============================
+
+It is often convenient to store random things about a syntax tree while
+working with it.  Often these additional information are associated with
+a particular node and should be easy to retrieve given that node.
+
+   Suppose the derivation routine in our example program works in two
+passes.  The first pass goes over the whole expression and determines
+which parts of it are constant; the second pass then uses this
+information to make some shortcuts.  It would be most convenient if each
+node type had an additional field `is_constant' that carried the
+information about constness of the expression originating at that node.
+But we haven't thought about this in advance and we don't want to change
+the node type definitions everytime someone wants to stick some private
+information to the nodes.
+
+   This is analogous to the previous section.  We can't modify the node
+type definitions specifically for each user of libfire, so we have to
+find a generic way to dynamically attach data to nodes.
+
+   We could use a hash table that is indexed with the nodes for each
+individual piece of data that we want to attach.  But there is a better
+way.  Each node object gets to carry a list of "properties".  A
+property is a key/value pair, where the key is a small integer and the
+value is a `void' pointer.  The base node has `put' and `get' functions
+to set and retrieve these properties.  Additionally, there is a
+function that returns unique keys.
+
+     int get_unique_key ();
+
+     struct expression {
+       ...
+       void  put (int key, void *value);
+       void *get (int key);
+     };
+
+   Now, each piece of code can request its own individual key and use
+it to hand arbitrary structures to the nodes. Like this
+
+     struct deriver_info {
+       bool is_const;
+     };
+
+     deriver_info *
+     get_deriver_info (expression *e) const
+     {
+       static int deriver_key = get_unique_key ();
+
+       deriver_info *d = (deriver_info *) e->get(deriver_key);
+       if (d == NULL)
+         {
+           d = new deriver_info;
+           d->is_const = false;
+           e->put (deriver_key, d);
+         }
+       return d;
+     }
+
+     // to make things more convenient
+
+     inline bool&
+     is_const (expression *e)
+     {
+       return get_deriver_info(e)->is_const;
+     }
+
+       ...
+       is_const (e) = true;
+       ...
+       if (is_const (e))
+         {
+           ...
+         }
+
+   As usual, we spot some boilerplate code here that could be
+automatically generated to make this maximally convenient.  The
+`gen-nodes' tool explained in the next chapter can do this, too.
+
+
+File: fire.info,  Node: New Types,  Prev: Extending,  Up: Introduction
+
+1.4 Defining new Node Types
+===========================
+
+We now have some methods for defining some kind of virtual functions on
+the node types and decorating the tree with arbitrary data, all without
+having to change the node type definitions themselves.  This is great.
+But what about defining completely new node types?  The method for
+attaching data to the nodes from the previous section clearly has no
+problem with that.  As long as the new node types are derived from the
+common base of all node types, everything is fine.
+
+   It is not so easy with the Visitor pattern.  The base class of all
+visitors has to know about all node types that are there because it has
+to provide a `visit' function for each of them.  It looks like we need
+some coordination between the individual modules that want to define
+new node types.
+
+   Fortunately, this coordination can be automated and the `gen-nodes'
+tool can handle this situation just fine.
+
+
+File: fire.info,  Node: Using gen-nodes,  Next: Using the Generated Code,  Prev: Introduction,  Up: Top
+
+2 Using `gen-nodes'
+*******************
+
+As hinted at in the introduction, much of the code that is needed to
+implement useful node types can be automatically generated from a
+condensed, _high level_ description of the desired features.
+
+   The tool `gen-nodes' can read such a description and crank out the
+corresponding C++ code.  The input to `gen-nodes' is essentially
+written in a custom programming language that has been specifically
+invented for this purpose.
+
+   So you have to learn a new programming language just to use libfire?
+Almost.  First, you only need to know this new language when you are
+actually working on the high level descriptions, of course.  When you
+are only accessing the ready made node types from C++, you can maybe get
+away without ever looking at such a high level description.
+
+   Second, this new language is actually quite simple.  I'm tempted to
+say that it is simpler to learn it than to learn all the rules about
+hand-writing the node type definitions.  Anyway, even if you do not
+immediatly plan to hack the high level description you should quickly
+browse thru this chapter to get an idea what `gen-nodes' is all about.
+It should be fairly easy to pick up enough to make some sense out of
+the description files (for first hand fact about FIRE) even if you
+don't internalize enough to write them yourself.
+
+* Menu:
+
+* Chunks::
+* Invoking gen-nodes::
+* Descriptions::
+
+
+File: fire.info,  Node: Chunks,  Next: Invoking gen-nodes,  Up: Using gen-nodes
+
+2.1 Chunks
+==========
+
+A central concept for the high level description of the features of the
+abstract syntax graph is the "chunk".  The complete description is
+coarsly divided into chunks with the guarantee that the C++ code
+generated for one chunk is as independent from the code generated for
+other chunks as it can be.
+
+   This is intented to facilitate the link-time composition and
+coordination of independent modules.  For example, the libfire library
+defines a chunk named `fire' that contains all its ready made node
+types and assorted generic functions.  The libvaul library, which uses
+libfire, defines its own chunk named `vaul' that contains all its
+private extensions.  The `fire' chunk is completely independent from
+the `vaul' chunk.  Changing the `vaul' chunk does in no way influence
+the compiled and installed libfire or any other libraries and
+applications that do not use libvaul.
+
+   This might sound like a trivial thing, and indeed it is just what we
+expect from a system of independent modules.  But C++ does not make it
+particular easy to achieve all the goodies that we want from the node
+types without introducing unwanted dependencies between logically
+independent modules.  We have to use some non-trivial implementation
+tricks for avoiding these unwanted dependencies.
+
+   The chunks are used to specify which parts should be decoupled and
+conversely, for which parts `gen-nodes' is allowed to forget about
+independence and go for a more efficient implementation instead.
+
+   The net result is that two files are generated for each chunk: one
+C++ header file and one C++ file with the implementation.  Whenever you
+change a chunk, these two files need to be regenerated and consequently
+all components of your program that use these files need to be
+recompiled or relinked.  The point of `gen-nodes' is allow you extend
+and augment the definitions in one chunk without actually changing that
+chunk.
+
+
+File: fire.info,  Node: Invoking gen-nodes,  Next: Descriptions,  Prev: Chunks,  Up: Using gen-nodes
+
+2.2 Invoking `gen-nodes'
+========================
+
+When the preprocessor `gen-nodes' is called as
+
+     gen-nodes CMD CHUNK IN-FILE OUT-FILE
+
+   it will read in a file named IN-FILE that contains the high-level
+description and generate from it the file called OUT-FILE, according to
+CMD and CHUNK.  The file OUT-FILE will contain the code for the chunk
+named CHUNK, which must be defined somewhere in IN-FILE.  When CMD is
+equal to `header', OUT-FILE will be a C++ header file; when CMD is
+equal to `impl', it will the C++ implementation file.
+
+   Suppose you have a file called `fire-chunk.t' that defines a chunk
+named `fire'.  Then you can generate the C++ files `fire-chunk.h' and
+`fire-chunk.cc' from it with these two invokations of `gen-nodes':
+
+     gen-nodes header fire fire-chunk.t fire-chunk.h
+     gen-nodes impl   fire fire-chunk.t fire-chunk.cc
+
+   The program `gen-nodes' has some other features are not explained
+here.
+
+
+File: fire.info,  Node: Descriptions,  Prev: Invoking gen-nodes,  Up: Using gen-nodes
+
+2.3 The Description File
+========================
+
+The IN-FILE mentioned above is written in a custom language.  This
+section describes that language.  Along with it, it also describes the
+underlying concepts and the intended use of the features.
+
+* Menu:
+
+* General Syntax::
+* Options::
+* Toplevel Definitions::
+* Defining Primitive Types::
+* Defining Nodes::
+* Defining Generic Functions::
+* Defining Node Extensions::
+* Defining Creators::
+* Defining Unions::
+
+
+File: fire.info,  Node: General Syntax,  Next: Options,  Up: Descriptions
+
+2.3.1 General syntax
+--------------------
+
+The syntactic structure of the description language is that of LISP.
+That is, it is a fully parenthesized prefix notation.  The statements of
+the language are made up of lists and that lists consists of other
+nested lists or atoms.  A atom is everything that is not a list:
+numbers, identifiers (also called symbols), strings and some other
+things.  A list starts with a `(', contains zero or more whitespace
+separated elements, and ends with a `)'.  For example, the following is
+a typical statement:
+
+     (defnode variable (expression)
+       ((char* id)))
+
+   This statement is one list whose first element is the symbol
+`defnode'.  This symbol is the keyword of the statement and determines
+how the rest of the list is interpreted.  The general structure of such
+a `defnode' statement would be defined in this manual like this:
+
+ -- Macro: defnode name (base ...) (slot ...) option ...
+
+   with explainations what NAME, BASE, etc means.  The ellipsis `...'
+denotes that zero or more instances of the preceding element may be
+present.  For example, the first sublist in the `defnode' form above is
+allowed to contain any number of BASE elements.
+
+   Symbols can contain extended characters in addition to the ususal
+alpha-numeric ones and the underscore.  The following characters are
+also valid in symbols:
+
+          + - . * / < = > ! ? : $ % _ & ~ ^
+
+   But note that most symbols are copied verbatim into the generated C++
+code and so you must make sure that they are also valid C++ identifiers.
+
+   Strings are a sequence of arbitary characters enclosed in double
+quotes `"'.  The backslash `\\' can be used as an escape character.
+
+   For the full story, refer to the definition of the programming
+language Scheme.
+
+   If you are already familiar with Scheme, it might be interesting for
+you to know that the description files are in fact executed as Scheme
+code.  The special statements that are explained in the sequel are
+actually Scheme macros that are defined while the description file is
+executed.  However, what you can precisely do within the description
+files is currently defined by the implementation of `gen-nodes', which
+uses GNU Guile as its Scheme interpreter.  Time will tell whether we
+need a more precise definition of the contents of the description
+files.  For now, please read the existing description files or the
+source code of `gen-nodes' to find out what you can do.
+
+
+File: fire.info,  Node: Options,  Next: Toplevel Definitions,  Prev: General Syntax,  Up: Descriptions
+
+2.3.2 Options
+-------------
+
+Many of the statements defined below accept a list of options.  These
+options follow a common syntax and are used to have a way to easily and
+robustly extend the statements with random features.  An option is a
+key/value pair and every statement that takes options defines what keys
+are valid for it and what the value means.
+
+   Syntactically, an option is a list whose first element is a symbol
+(the key of the option) and the rest are arbitrary elements (the value
+for the key).  For example
+
+     (cname "int")
+
+is an option with key `cname' and value `"int"'.
+
+   Options can have more than value: `(cname "int" xyzzy)' would be
+just as valid.  It depends on the individual option whether these
+additional values are simply ignored or whether they have a menaing.
+
+
+File: fire.info,  Node: Toplevel Definitions,  Next: Defining Primitive Types,  Prev: Options,  Up: Descriptions
+
+2.3.3 Toplevel Definitions
+--------------------------
+
+You can include the text of additional files into your description by
+using the `include' statement.
+
+ -- Macro: include file
+     Read and interpret the contents of FILE.  This can be used when
+     you want to use node types from other chunks in the following code.
+
+   A chunk is started by the `chunk' statement and continues until the
+next chunk is started or the description file ends.
+
+ -- Macro: chunk name option ...
+     Start the chunk named NAME (a symbol).  The following options are
+     defined for chunks, they all take one value:
+
+    `struct-fmt STRING'
+    `struct-fmt-func FUNCTION'
+          These two options can be used to control the way node type
+          names are translated into C++ struct names.  `struct-fmt'
+          defines the format string used when emitting such a structure
+          name.  It should contain exactly one instance of `"~a"',
+          which will be replaced with the name of the node type.
+          Defaults to "s~a".
+
+          `struct-fmt-func' can be used to specify a function that
+          constructs the C++ struct name from a symbol.  It takes
+          precedence over `struct-fmt'.
+
+    `pointer-fmt STRING'
+    `pointer-fmt-func FUNCTION'
+          Like `struct-fmt' but for the C++ names of the types that are
+          pointers to the node type structs.  Defaults to `"n~a"'.
+
+    `kind-fmt STRING'
+    `kind-fmt-func FUNCTION'
+          Like `struct-fmt' but for the names of the C++ name of the
+          kind identifier of a node type.  Defaults to `"nk~a"'.
+
+    `creater-fmt STRING'
+    `creater-fmt-func FUNCTION'
+          Like `struct-fmt' but for the names of creator functions for a
+          certain node type.  Defaults to `"m~a"'.
+
+    `default-base SYMBOL'
+          The C++ name of the struct that will be used when a `defnode'
+          statement does not specify a base type.  Defaults to
+          `tree_base_node'.
+
+     It is necessary to put additional lines at the top of the
+     generated C++ files to set up the context in that there are
+     compiled.  You can use the following two statements for this.
+
+      -- Macro: header-add string ...
+          Each STRING is copied verbatim to the start of the generated
+          header file.
+
+      -- Macro: impl-add string ...
+          Like `header-add' but for the C++ implementation file.
+
+     The generated files do not contain any `#include' directives on
+     their own.  However, they expect that the header files for the
+     run-time support machinery have been included.  You have to
+     arrange for that yourself, typically by adding a line like
+
+          #include <tree-supp.h>
+
+     in the header file and then includung the generated header file in
+     the implementation file.
+
+
+
+File: fire.info,  Node: Defining Primitive Types,  Next: Defining Nodes,  Prev: Toplevel Definitions,  Up: Descriptions
+
+2.3.4 Defining Primitive Types
+------------------------------
+
+In addition to links to other nodes, a node can also contain slots of
+arbitary C++ types.  Each of the C++ types that you want to use for such
+payloads needs to be defined with the `defctype' statement.
+
+ -- Macro: defctype name option ...
+     Define a new primitive type named NAME.  The following options are
+     available:
+
+    `cname STRING'
+          The string used in the generated C++ code to refer to this
+          type.  Defaults to the name of the primitive type.
+
+
+
+File: fire.info,  Node: Defining Nodes,  Next: Defining Generic Functions,  Prev: Defining Primitive Types,  Up: Descriptions
+
+2.3.5 Defining Nodes
+--------------------
+
+ -- Macro: defnode name bases (slot ...) option ...
+     Define a new node type named NAME.  It's inheritance is determined
+     by BASES.  When BASES is the empty list `()' the new node type
+     derives from the default base as determined by the chunk options.
+     Otherwise, BASES must contains exactly one symbol which is the
+     name of a previously defined node type.  The new node type
+     inherits all slots from its base type.
+
+     A SLOT defines one data member of the node type.  The syntax of a
+     slot definition is
+
+          (TYPE NAME OPTION ...)
+
+     where NAME (a symbol) is the name of the slot and TYPE is either a
+     name defined by `defnode' or a name defined by`defctype'.  When
+     the type has been defined by `defnode' the slot is called a
+     "reference" slot and can be used to point to a node of that type
+     or that is derived from it.  When the type has been definied by
+     `defctype', the slot is called a "payload" slot.  Node slots take
+     the following option:
+
+    `init-filter STRING'
+          This can be used to affect the initialization of new node
+          structs.  The string is a C++ expression that is evaluated
+          for initializing this slot.  It can use the name of the slot
+          to get the value that has originally been passed to the
+          constructor.
+
+     The follwing options are available for node types:
+
+    `extra STRING ...'
+          The strings are included verbatim in the C++ struct
+          definition that will be generated for this node type
+          definition.
+
+    `reverse SLOT-NAME'
+          When this option is present, a function named "reverse" will
+          be generated for this node type.  This function can be used to
+          destructively reverse singly linked lists of node structs.
+          The slot named SLOT-NAME is used as the link to the next node
+          in the list.
+
+
+
+File: fire.info,  Node: Defining Generic Functions,  Next: Defining Node Extensions,  Prev: Defining Nodes,  Up: Descriptions
+
+2.3.6 Defining Generic Functions
+--------------------------------
+
+Generic functions are functions that dispatch at run-time to one of
+several "methods".  The dispatching is based on the run-time type of
+first argument of the generic function.  The methods are themselves
+functions, one for each node type that should be distinuished.
+
+ -- Macro: defgeneric name option ...
+     Defines a new generic function named NAME.  When NAME is a symbol,
+     then the generic function will be a normal global C++ function.
+     When NAME is a list of symbols, the generic function will be
+     generated as a C++ class member function.  The elements, which
+     should all be symbols, are the elements of the fully qualified C++
+     name of the function.  For example `(foo bar)' would denote the
+     C++ function named `foo::bar'.  All the intersting things about
+     generic functions are expressed with options:
+
+    `return TYPE'
+          Specify the return type of the function and its methods.  TYPE
+          must either be defined by `defctype' or by `defnode'.
+          Defaults to `void'.
+
+    `args (TYPE NAME) ...'
+          Specify additional arguments for the generic function and its
+          methods (in addition to the mandatory first argument which is
+          always a pointer to a node struct).  Defaults to the empty
+          list.
+
+    `methods NODE-TYPE ...'
+          Specify some methods that should be defined for this generic
+          functions.  This is equivalent to
+
+               (defmethods NAME
+                 (NODE-TYPE ...)
+                 (args (TYPE NAME) ...))
+
+          Defaults to the empty list.
+
+
+ -- Macro: defmethods name (node-type ...) option ...
+     Define methods for the generic function named NAME.  To uniquely
+     specify a generic function, it might be necessary to use the `args'
+     option.  The NODE-TYPE list specifies which methods are defined.
+     For each node type in that list, the generic function will
+     dispatch to a individual C++ function.  That function is named
+     like the generic function but with a `m_' prefix.  You must write
+     the implementation of that function.
+
+     When the generic function is a global function (i.e. the NAME is a
+     symbol), then the generated C++ header file will contain
+     prototypes for the method functions.  When it is a class member
+     function the user is supposed to provide these prototypes on his
+     own.
+
+     You can define methods for generic functions from arbitrary chunks
+     but you can only define one method for each specific node type.
+     You will receive a run-time error when you mix chunks that define
+     conflicting methods.
+
+
+File: fire.info,  Node: Defining Node Extensions,  Next: Defining Creators,  Prev: Defining Generic Functions,  Up: Descriptions
+
+2.3.7 Defining Node Extensions
+------------------------------
+
+You can add additional slots to node types after they have been defined.
+
+ -- Macro: defextension node-type (slot ...) option ...
+     Add the specified SLOTs to NODE-TYPE.  the syntax for an extension
+     SLOT is just like that for a normal node slot, but it takes
+     different options:
+
+    `= STRING'
+          The initial value of the slot.
+
+
+
+File: fire.info,  Node: Defining Creators,  Next: Defining Unions,  Prev: Defining Node Extensions,  Up: Descriptions
+
+2.3.8 Defining Creators
+-----------------------
+
+A "creator" can be used to customize the allocation and initialization
+of node structs.  On the C++ side, a creator is a struct with a member
+function for each node type that it should be able to create.
+
+ -- Macro: defcreator name option ...
+     Define a new creator named NAME (a symbol).  The rest is specified
+     by options:
+
+    `base SYMBOL'
+          The base struct of the emitted C++ struct for the creator.
+          Defaults to no base class.
+
+    `chunks CHUNK-NAME ...'
+          The creator will have creation functions for all node types
+          from the listed chunks.
+
+    `placement STRING'
+          New node structs are allocated with the C++ operator `new'.
+          The STRING can be used to give the call to that operator a
+          placement expression.
+
+    `inits NODE-INIT ...'
+          Each NODE-INIT specifies how the slots of one node type
+          should be initialized.  It is explained below.
+
+
+   The `inits' is quite a complicated option.  It is a list of
+NODE-INITs, where each NODE-INIT has this syntax:
+
+     (NODE-TYPE ((SLOT-NAME SLOT-INIT) ...) OPTION ...)
+
+   This says that for the node type name NODE-TYPE and all the node
+types derived from it, the slot named SLOT-NAME should be initialized
+according to SLOT-INIT.  The options might influence the definition of
+the creator function for NODE-TYPE.
+
+   For backwards compatability, you can also use
+     (NODE-TYPE (SLOT-NAME SLOT-INIT) ...)
+   when you don't have any options.
+
+   When you specifiy more than one NODE-INIT for the same NODE-TYPE,
+you get more than one creation function in the generated creator, one
+for each NODE-INIT.  This extends to the node types derived from
+NODE-TYPE.  For example, when you have a node type named `deriv' that
+is derived from the node type `base', and you have two NODE-INITS for
+`deriv' and two for `base', you get four creation functions for node
+type `deriv'.  One for each combination of NODE-INITS.  (The options
+are combined as well.)
+
+   Each SLOT-INIT in a NODE-INIT determines how a specific slot should
+be initialized from what arguments to the creator function.  Generally,
+each slot specifies zero or more arguments for the creator function.
+These arguments are ordered just like the definition of the slots in
+the `defnode' statement, with slots from a base type appearing first.
+Then, each slot specifies an expression that computes the initial value
+of the slot from these arguments.
+
+   When no SLOT-INIT is specified for a certain slot slot, the default
+behaviour applies.  Such a slot specifies one argument for the creation
+function that has the same type as the slot, and its initialization
+expression just copies this argument into the slot.
+
+   The follwing table lists the possibilities for a SLOT-INIT:
+
+`(wrap ((TYPE NAME) ...) EXPRESSION)'
+     This is the most general form.  It specifies the arguments
+     indicated by `(TYPE NAME) ...' for the creation function and
+     EXPRESSION (a string) as the initialization expression.  Within
+     EXPRESSION the arguments are available by their NAMEs.
+
+`STRING'
+     This is equivalent to `(wrap () STRING)', i.e., a constant
+     initialization value.
+
+   There is one option available: `construct-extra'.  This option
+specifies a function that should be called with the newly created node
+to perform additional initialization.  All such options are combined,
+and functions from base node types are called before functions for the
+derived node types.
+
+
+File: fire.info,  Node: Defining Unions,  Prev: Defining Creators,  Up: Descriptions
+
+2.3.9 Defining Unions
+---------------------
+
+This is just a hack that I needed for making it easier to work with
+`bison' generated parsers.
+
+ -- Macro: defunion name option ...
+     Generate a C++ union declaration that contains pointers to all node
+     structs defined in the chunks listed by the `chunk' option.
+
+
+File: fire.info,  Node: Using the Generated Code,  Next: FIRE Reference,  Prev: Using gen-nodes,  Up: Top
+
+3 Using the Generated Code
+**************************
+
+The generated code uses some C++ trickery to initialize itself at
+program start, but this machinery does not seem to work reliably on all
+platforms with all shared library implementations.  So, you might want
+to call the intitialization functions yourself.
+
+   Each chunk defines a initialization function with a name like
+`init_name_chunk' where `name' is replaced with the chunk name.  You
+can call this function as often as you like, only the first invocation
+has any effect.  Each initialization function automatically calls the
+initialization functions of all chunks that are used by its chunk.
+
+   The rule is that you should call the initialization functions of
+those chunks that you create nodes from, whose generic functions you
+will call and whose extension slots you will access.
+
+* Menu:
+
+* Node Structures::
+* Garbage Collection::
+* Generic Functions::
+
+
+File: fire.info,  Node: Node Structures,  Next: Garbage Collection,  Up: Using the Generated Code
+
+3.1 Node Structures
+===================
+
+The generated C++ code will contain a `struct' type for each node type
+defined in the chunk.  The name of that struct will be determined by
+the `struct-fmt' or `struct-fmt-func' option of the chunk.
+
+   Each slot of the node type is translated into a public data member of
+that struct.  For reference slots, the type of that data member is a
+pointer to the node struct of the refenced node type.  For payload
+slots, the type is as given by the `defctype' statement.
+
+   The struct will contain a constructor with one argument for each of
+its effective slots.  The effective slots of a node type are an ordered
+list of all slots that are defined for the node type and all its base
+classes.  The order is such that the effective slots from the base type
+precede the slots directly defined in the `defnode' statement, and the
+direct slots are in the order given by by the `defnode' statement.  The
+arguments to the constructor are in the same order as the list of
+effective slots.  The type of each argument is that of its
+corresponding slot and the value of the argument is passed to the
+expression givin with the `init-filter' option of the slot.  The value
+of that expression is assigned to the slot.
+
+   You must allocate node on the heap, via the C++ operator `new',
+because the garbage collector will call `delete' on them.
+
+   In addition to the struct type, a type is declared that is a pointer
+to that struct.  The name of this type is given by the `pointer-fmt' or
+`pointer-fmt-func' option of the chunk.
+
+   Each node type can be identified by an unique value of type
+`tree_kind' called its "kind".  That value can be accessed via a name
+that is determined by the `kind-fmt' or `kind-fmt-func' option of the
+chunk.  Such a kind value is actually a pointer to a struct that
+contains information about the node type, but you should not rely on
+that.
+
+   All node structs ultimately inherit from the predefined
+`tree_base_node' struct.  That struct provides several features that
+are thus available for every node struct.
+
+ -- Method on tree_base_node: tree_kind kind ()
+     Return the kind identifier of a node struct.
+
+ -- Method on tree_base_node: char* kind_name ()
+     Return the name of the node type of a node struct.  This is the
+     name given in the `defnode' statement.
+
+ -- Method on tree_base_node: bool is (tree_kind base)
+     Determine whether the node struct inherits from or is of the node
+     type indicated by BASE.
+
+   You can also work directly with node kinds.
+
+ -- Function: char* tree_kind_name (tree_kind kind)
+     Return the name of the node kind indicated by KIND.
+
+ -- Function: bool tree_is (tree_kind kind, tree_kind base)
+     Determine whether KIND inherits from or is the same as BASE.
+
+ -- Function: tree_kind tree_base (tree_kind kind)
+     Return the base kind of KIND.
+
+   You can decorate node structs with arbitrary data.
+
+ -- Function: int tree_uniq_prop_key (tree_kind kind)
+     Return a new integer key that can be used to identify properties
+     on node structs of types indicated by KIND, or derived.  For a
+     maximally dense packing of keys, you should get keys for base
+     classes before their derived classes.
+
+ -- Method on tree_base_node: void put (int key, tree_prop *prop)
+     Install the property struct PROP in the node struct, identified by
+     KEY.  The type `tree_prop' has no useful features, it is just
+     there to serve as a base type for all property structs.
+
+ -- Method on tree_base_node: tree_prop get (int key)
+     Retrieve the `tree_prop' struct stored at KEY.  If no struct has
+     previously been set, return `NULL'.
+
+   The extension slots use this mechanism to do their thing.  For each
+extension slot, there will be a function that takes a node struct as its
+argument and returns a reference to the storage of the extension slot.
+The name of this function is the name of the extension slot.
+
+
+File: fire.info,  Node: Garbage Collection,  Next: Generic Functions,  Prev: Node Structures,  Up: Using the Generated Code
+
+3.2 Garbage Collection
+======================
+
+The memory allocated to node structs is managed by a garbage collector.
+You create new nodes by calling `new' on the appropriate struct type
+but you should never explicitely call `delete' on them.  Instead call
+`tree_garbage_collect' from time to time to collect and free all unused
+nodes.
+
+   Which nodes are unused is determined by finding all nodes that are
+reachable vie reference slots from a set of root nodes.  All unreachable
+nodes are considered gartbage and are freed.  Therefore, you must make
+sure that all nodes that you care about are reachable by one or more
+pathes from a root node whenever `tree_collect_garbage' (or
+`tree_unblock_garbage_collection', see below) is called.
+
+ -- Function: void tree_collect_garbage ()
+     Find and free all nodes that are not reachable via one of the root
+     nodes.  When garbage collections are blocked, this function does
+     not actually perform a collection.  Instead, it sets a flag so
+     that a collection is performed immediatly after collections are
+     unblocked.
+
+ -- Function: void tree_maybe_collect_garbage (int threshold)
+     Call `tree_collect_garbage' when more than THRESHOLD nodes have
+     been allocated since the last collection.  When THRESHOLD is -1,
+     `tree_collect_garbage' is called unconditionally.
+
+ -- Function: void tree_block_garbage_collection ()
+     Block all attempts at garbage collection until
+     `tree_unblock_garbage_collection' is called.  You need to call
+     `tree_unblock_garbage_collection' for every call to
+     `tree_block_garbage_collection' before collections are really
+     unblocked.
+
+ -- Function: void tree_unblock_garbage_collection ()
+     Unblock one level of collection blocks.  When this is the last
+     level and collection are again allowed, and `tree_collect_garbage'
+     has been called while the collection were blocked, perform a
+     collection now.
+
+ -- Function: void tree_protect (tree_base_node *node)
+     Add NODE to the set of root nodes.  You can add NODE multiple
+     times and it will remain in the set until you remove it that many
+     times again.
+
+ -- Function: void tree_unprotect (tree_base_node *node)
+     Remove NODE from the set of root nodes.
+
+ -- Function: void tree_protect_loc (tree_base_node **loc)
+     Remember LOC so that whenever a collection is performed, the node
+     pointed at by `*LOC' is considered a root node.  You can add LOC
+     multiple times and it will remain in the set until you remove it
+     that many times again.
+
+ -- Function: void tree_unprotect_loc (tree_base_node **loc)
+     Remove LOC from the set of remembered root node pointers.
+
+
+File: fire.info,  Node: Generic Functions,  Prev: Garbage Collection,  Up: Using the Generated Code
+
+3.3 Generic Functions
+=====================
+
+A generic function is just a normal C++ function, either a global
+function or a member function.  Calling it will dispatch to one of
+several methods, depending on the run-time type of its first argument.
+The first argument of a generic function is always a pointer to a struct
+derived from `tree_base_node'.  The additional arguments are as
+specified in the `defgeneric' statement are not inspected by the
+generic function.
+
+   Once a method has been selected by the generic function, all
+arguments to the generic function are passed to that method and the
+return value of the method is returned from the generic function.
+
+   A method is also a normal C++ function.  It has the same name as the
+generic function, but with a `m_' prefix.  It has the same arguments as
+the generic function, but the first argument has as its static type a
+pointer to the specific node struct that this method is intended for.
+That is, all method have the same name, but they are distinguished by
+the type of their first argument.
+
+   You are supposed to write the implementation of all methods
+announced in a chunk.
+
+
+File: fire.info,  Node: FIRE Reference,  Prev: Using the Generated Code,  Up: Top
+
+4 FIRE Reference
+****************
+
+As mentioned in the introduction, FIRE stands for Feeble Intermediate
+Representation with Extensibility.  This is of course a pun on AIRE, the
+Advanced Intermediate Representation with Extensibility.
+
+   AIRE defines a sophisticated data structure that can be used to share
+design information between tool components, as they state in the
+extensive specification document(1).  I intend to make FIRE compliant
+with the AIRE specification sometime and then abandon the name FIRE; or
+to just out-live AIRE and stick to FIRE.
+
+   But right now and in the near future, my focus is more on the general
+mechanisms used to implement the basic features of a useful abstract
+syntax tree.  FIRE will be superficially similar to AIRE and I will of
+course try to avoid gratitous incompatibilities between them.  But the
+extension mechanism will be completely different, for example.
+
+* Menu:
+
+* Overview::
+* Primitive Types::
+* Base Class::
+* Literals::
+* Tupels::
+* Lists::
+* Type Definitions::
+* Declarations::
+* Expressions::
+* Attributes::
+* Sequential Statements::
+* Concurrent Statements::
+* All together now::
+
+   ---------- Footnotes ----------
+
+   (1) insert URL
+
+
+File: fire.info,  Node: Overview,  Next: Primitive Types,  Up: FIRE Reference
+
+4.1 Overview
+============
+
+FIRE defines a set of node types and a set of primitive types that
+appear as payload on the nodes.  The names of these types follow the
+AIRE specification quite closely.
+
+   The precise mechanics of actually using `libfire' are undocumented
+at this time.  This is going to change of course.
+
+   The node types have a prefix of `IIR_'.  For each defined node type
+`IIR_Foo', there is a C++ struct type `IIR_Foo', a type that is a
+pointer to this struct with the name `pIIR_Foo', and a kind identifier
+named `IR_FOO'.
+
+   The primitive types have a prefix of `IR_'.
+
+   Here are all defined FIRE node types, arranged in a hierarchy.
+
+     tree_base_node
+     |
+     +-IIR_Root
+     | |
+     | +-IIR_SequentialStatement
+     | | |
+     | | +-IIR_NullStatement
+     | | |
+     | | +-IIR_ReturnStatement
+     | | |
+     | | +-IIR_LoopControlStatement
+     | | | |
+     | | | +-IIR_ExitStatement
+     | | | |
+     | | | \-IIR_NextStatement
+     | | |
+     | | +-IIR_LoopStatement
+     | | | |
+     | | | +-IIR_WhileLoopStatement
+     | | | |
+     | | | \-IIR_ForLoopStatement
+     | | |
+     | | +-IIR_CaseStatement
+     | | |
+     | | +-IIR_IfStatement
+     | | |
+     | | +-IIR_ProcedureCallStatement
+     | | |
+     | | +-IIR_VariableAssignmentStatement
+     | | |
+     | | +-IIR_SignalAssignmentStatement
+     | | |
+     | | +-IIR_ReportStatement
+     | | |
+     | | +-IIR_AssertionStatement
+     | | |
+     | | \-IIR_WaitStatement
+     | |
+     | +-IIR_Expression
+     | | |
+     | | +-IIR_ValueAttr
+     | | | |
+     | | | \-IIR_AttrTypeValue
+     | | |   |
+     | | |   +-IIR_Attr_LENGTH
+     | | |   |
+     | | |   +-IIR_Attr_ASCENDING
+     | | |   |
+     | | |   +-IIR_Attr_HIGH
+     | | |   |
+     | | |   +-IIR_Attr_LOW
+     | | |   |
+     | | |   +-IIR_Attr_RIGHT
+     | | |   |
+     | | |   \-IIR_Attr_LEFT
+     | | |
+     | | +-IIR_FunctionAttr
+     | | | |
+     | | | +-IIR_AttrArrayFunc
+     | | | | |
+     | | | | +-IIR_Attr_ArrayLENGTH
+     | | | | |
+     | | | | +-IIR_Attr_ArrayASCENDING
+     | | | | |
+     | | | | +-IIR_Attr_ArrayLOW
+     | | | | |
+     | | | | +-IIR_Attr_ArrayHIGH
+     | | | | |
+     | | | | +-IIR_Attr_ArrayRIGHT
+     | | | | |
+     | | | | \-IIR_Attr_ArrayLEFT
+     | | | |
+     | | | +-IIR_AttrTypeFunc
+     | | | | |
+     | | | | +-IIR_Attr_RIGHTOF
+     | | | | |
+     | | | | +-IIR_Attr_LEFTOF
+     | | | | |
+     | | | | +-IIR_Attr_PRED
+     | | | | |
+     | | | | +-IIR_Attr_SUCC
+     | | | | |
+     | | | | +-IIR_Attr_VAL
+     | | | | |
+     | | | | +-IIR_Attr_POS
+     | | | | |
+     | | | | +-IIR_Attr_VALUE
+     | | | | |
+     | | | | \-IIR_Attr_IMAGE
+     | | | |
+     | | | \-IIR_AttrSigFunc
+     | | |   |
+     | | |   +-IIR_Attr_DRIVING_VALUE
+     | | |   |
+     | | |   +-IIR_Attr_DRIVING
+     | | |   |
+     | | |   +-IIR_Attr_LAST_VALUE
+     | | |   |
+     | | |   +-IIR_Attr_LAST_ACTIVE
+     | | |   |
+     | | |   +-IIR_Attr_LAST_EVENT
+     | | |   |
+     | | |   +-IIR_Attr_ACTIVE
+     | | |   |
+     | | |   \-IIR_Attr_EVENT
+     | | |
+     | | +-IIR_ObjectReference
+     | | | |
+     | | | +-IIR_SignalAttr
+     | | | | |
+     | | | | +-IIR_Attr_TRANSACTION
+     | | | | |
+     | | | | +-IIR_Attr_QUIET
+     | | | | |
+     | | | | +-IIR_Attr_STABLE
+     | | | | |
+     | | | | \-IIR_Attr_DELAYED
+     | | | |
+     | | | +-IIR_GenericArrayReference
+     | | | | |
+     | | | | +-IIR_SliceReference
+     | | | | |
+     | | | | \-IIR_ArrayReference
+     | | | |
+     | | | +-IIR_RecordReference
+     | | | |
+     | | | +-IIR_AccessReference
+     | | | |
+     | | | \-IIR_SimpleReference
+     | | |
+     | | +-IIR_OpenExpression
+     | | |
+     | | +-IIR_Allocator
+     | | |
+     | | +-IIR_TypeConversion
+     | | |
+     | | +-IIR_QualifiedExpression
+     | | |
+     | | +-IIR_FunctionCall
+     | | |
+     | | +-IIR_Aggregate
+     | | | |
+     | | | +-IIR_ArrayAggregate
+     | | | | |
+     | | | | \-IIR_ArtificialArrayAggregate
+     | | | |
+     | | | \-IIR_RecordAggregate
+     | | |   |
+     | | |   \-IIR_ArtificialRecordAggregate
+     | | |
+     | | +-IIR_NullExpression
+     | | |
+     | | +-IIR_EnumLiteralReference
+     | | |
+     | | +-IIR_ArrayLiteralExpression
+     | | |
+     | | \-IIR_AbstractLiteralExpression
+     | |   |
+     | |   \-IIR_PhysicalLiteral
+     | |
+     | +-IIR_Declaration
+     | | |
+     | | +-IIR_UseClause
+     | | |
+     | | +-IIR_LibraryClause
+     | | |
+     | | +-IIR_Label
+     | | |
+     | | +-IIR_DisconnectSpecification
+     | | |
+     | | +-IIR_PhysicalUnit
+     | | |
+     | | +-IIR_LibraryDeclaration
+     | | |
+     | | +-IIR_AttributeDeclaration
+     | | |
+     | | +-IIR_ObjectDeclaration
+     | | | |
+     | | | +-IIR_InterfaceDeclaration
+     | | | | |
+     | | | | +-IIR_FileInterfaceDeclaration
+     | | | | |
+     | | | | +-IIR_SignalInterfaceDeclaration
+     | | | | |
+     | | | | +-IIR_VariableInterfaceDeclaration
+     | | | | |
+     | | | | \-IIR_ConstantInterfaceDeclaration
+     | | | |
+     | | | +-IIR_FileDeclaration
+     | | | |
+     | | | +-IIR_SignalDeclaration
+     | | | |
+     | | | +-IIR_VariableDeclaration
+     | | | | |
+     | | | | \-IIR_SharedVariableDeclaration
+     | | | |
+     | | | \-IIR_ConstantDeclaration
+     | | |
+     | | +-IIR_TypeDeclaration
+     | | | |
+     | | | \-IIR_SubtypeDeclaration
+     | | |
+     | | +-IIR_ElementDeclaration
+     | | |
+     | | +-IIR_EnumerationLiteral
+     | | |
+     | | \-IIR_DeclarativeRegion
+     | |   |
+     | |   +-IIR_ConcurrentStatement
+     | |   | |
+     | |   | +-IIR_ConcurrentGenerateStatement
+     | |   | | |
+     | |   | | +-IIR_ConcurrentGenerateIfStatement
+     | |   | | |
+     | |   | | \-IIR_ConcurrentGenerateForStatement
+     | |   | |
+     | |   | +-IIR_ComponentInstantiationStatement
+     | |   | |
+     | |   | +-IIR_ProcessStatement
+     | |   | | |
+     | |   | | +-IIR_SensitizedProcessStatement
+     | |   | | |
+     | |   | | \-IIR_ImplicitProcessStatement
+     | |   | |
+     | |   | \-IIR_BlockStatement
+     | |   |
+     | |   +-IIR_ConfigurationItem
+     | |   | |
+     | |   | +-IIR_ComponentConfiguration
+     | |   | |
+     | |   | \-IIR_BlockConfiguration
+     | |   |
+     | |   +-IIR_ArchitectureRef
+     | |   |
+     | |   +-IIR_LibraryUnit
+     | |   | |
+     | |   | +-IIR_ConfigurationDeclaration
+     | |   | |
+     | |   | +-IIR_PackageBodyDeclaration
+     | |   | |
+     | |   | +-IIR_PackageDeclaration
+     | |   | |
+     | |   | +-IIR_ArchitectureDeclaration
+     | |   | |
+     | |   | \-IIR_EntityDeclaration
+     | |   |
+     | |   +-IIR_ComponentDeclaration
+     | |   |
+     | |   +-IIR_SubprogramDeclaration
+     | |   | |
+     | |   | +-IIR_FunctionDeclaration
+     | |   | | |
+     | |   | | \-IIR_PredefinedFunctionDeclaration
+     | |   | |
+     | |   | \-IIR_ProcedureDeclaration
+     | |   |   |
+     | |   |   \-IIR_PredefinedProcedureDeclaration
+     | |   |
+     | |   \-IIR_LoopDeclarativeRegion
+     | |
+     | +-IIR_Type
+     | | |
+     | | +-IIR_FileType
+     | | |
+     | | +-IIR_AccessType
+     | | |
+     | | +-IIR_CompositeType
+     | | | |
+     | | | +-IIR_ArrayType
+     | | | |
+     | | | \-IIR_RecordType
+     | | |
+     | | +-IIR_ScalarType
+     | | | |
+     | | | +-IIR_PhysicalType
+     | | | |
+     | | | +-IIR_FloatingType
+     | | | |
+     | | | +-IIR_IntegerType
+     | | | |
+     | | | \-IIR_EnumerationType
+     | | |
+     | | \-IIR_Subtype
+     | |   |
+     | |   +-IIR_ArraySubtype
+     | |   |
+     | |   +-IIR_RecordSubtype
+     | |   |
+     | |   \-IIR_ScalarSubtype
+     | |
+     | +-IIR_Range
+     | | |
+     | | +-IIR_ArrayRange
+     | | | |
+     | | | +-IIR_Attr_ArrayREVERSE_RANGE
+     | | | |
+     | | | \-IIR_Attr_ArrayRANGE
+     | | |
+     | | \-IIR_ExplicitRange
+     | |
+     | +-IIR_List
+     | | |
+     | | +-IIR_IdentifierList
+     | | |
+     | | +-IIR_ConfigurationSpecificationList
+     | | |
+     | | +-IIR_ComponentInstantiationList
+     | | |
+     | | +-IIR_ElementAssociationList
+     | | |
+     | | +-IIR_IndexedAssociationList
+     | | |
+     | | +-IIR_ExpressionList
+     | | |
+     | | +-IIR_TypeList
+     | | |
+     | | +-IIR_WaveformList
+     | | |
+     | | +-IIR_UnitList
+     | | |
+     | | +-IIR_SequentialStatementList
+     | | |
+     | | +-IIR_LibraryUnitList
+     | | |
+     | | +-IIR_InterfaceList
+     | | |
+     | | +-IIR_EnumerationLiteralList
+     | | |
+     | | +-IIR_EntityClassEntryList
+     | | |
+     | | +-IIR_ElementDeclarationList
+     | | |
+     | | +-IIR_DeclarationList
+     | | |
+     | | +-IIR_ConfigurationItemList
+     | | |
+     | | +-IIR_ConcurrentStatementList
+     | | |
+     | | +-IIR_ChoiceList
+     | | |
+     | | +-IIR_CaseStatementAlternativeList
+     | | |
+     | | +-IIR_AttributeValueList
+     | | |
+     | | \-IIR_AssociationList
+     | |
+     | +-IIR_Tuple
+     | | |
+     | | +-IIR_ConfigurationSpecification
+     | | |
+     | | +-IIR_BindingIndication
+     | | |
+     | | +-IIR_AttributeValue
+     | | |
+     | | +-IIR_IndexedAssociation
+     | | | |
+     | | | +-IIR_OthersIndexedAssociation
+     | | | |
+     | | | +-IIR_RangeIndexedAssociation
+     | | | | |
+     | | | | \-IIR_SliceIndexedAssociation
+     | | | |
+     | | | \-IIR_SingleIndexedAssociation
+     | | |
+     | | +-IIR_ElementAssociation
+     | | |
+     | | +-IIR_WaveformElement
+     | | |
+     | | +-IIR_EntityClassEntry
+     | | |
+     | | +-IIR_Choice
+     | | | |
+     | | | +-IIR_ChoiceByOthers
+     | | | |
+     | | | +-IIR_ChoiceByRange
+     | | | |
+     | | | \-IIR_ChoiceByExpression
+     | | |
+     | | +-IIR_CaseStatementAlternative
+     | | |
+     | | \-IIR_AssociationElement
+     | |   |
+     | |   +-IIR_AssociationElementOpen
+     | |   |
+     | |   \-IIR_AssociationElementByExpression
+     | |
+     | +-IIR_Literal
+     | | |
+     | | +-IIR_AbstractLiteral
+     | | | |
+     | | | +-IIR_FloatingPointLiteral
+     | | | |
+     | | | \-IIR_IntegerLiteral
+     | | |
+     | | \-IIR_TextLiteral
+     | |   |
+     | |   +-IIR_StringLiteral
+     | |   |
+     | |   +-IIR_CharacterLiteral
+     | |   |
+     | |   \-IIR_Identifier
+     | |
+     | \-IIR_Dummy
+     |   |
+     |   \-IIR_Signature
+     |
+     \-IIR_PosInfo
+       |
+       +-IIR_PosInfo_Sheet
+       |
+       \-IIR_PosInfo_TextFile
+
+
+File: fire.info,  Node: Primitive Types,  Next: Base Class,  Prev: Overview,  Up: FIRE Reference
+
+4.2 Primitive Types
+===================
+
+FIRE defines the following C++ types.
+
+`IR_Character'
+     A character represented as a unsigned integer.  Right now, all we
+     can say about this is that it can contain ASCII character codes.
+     Anything beyond that is still undecided.
+
+`IR_String'
+     A read only string of `IR_Characters'.  See below for more
+     information on this type.
+
+`IR_Kind'
+     An alias for the `tree_kind' type of the basic tree support
+     facility.
+
+`IR_SignalKind'
+     An enumeration with the following members: `IR__NO_SIGNAL_KIND',
+     `IR_REGISTER_KIND', and `IR_BUS_KIND'.
+
+`IR_Mode'
+     An enumeration with the following members: `IR_UNKNOWN_MODE',
+     `IR_IN_MODE', `IR_OUT_MODE', `IR_INOUT_MODE',   `IR_BUFFER_MODE',
+     and `IR_LINKAGE_MODE'.
+
+`IR_Pure'
+     An enumeration with the following members: `IR_UNKNOWN_PURE',
+     `IR_PURE_FUNCTION', `IR_IMPURE_FUNCTION',   `IR_PURE_PROCEDURAL',
+     and `IR_IMPURE_PROCEDURAL'.
+
+`IR_Direction'
+     An enumeration with the following members: `IR_UNKNOWN_DIRECTION',
+      `IR_DIRECTION_UP', and `IR_DIRECTION_DOWN'.
+
+`IR_DelayMechanism'
+     An enumeration with the following members: `IR_UNKNOWN_DELAY',
+     `IR_INERTIAL_DELAY', and `IR_TRANSPORT_DELAY'.
+
+4.2.1 The `IR_String' type
+--------------------------
+
+A `IR_String' can hold a vector of `IR_Character's.  The length of that
+vector is determined by an explicit count so that the vector can
+contain arbitrary `IR_Character' values, including zeros.  The contents
+of the vector is read only and `IR_String's are allowed to share the
+memory of this vector.  In fact, copying a `IR_String' does not copy
+the vector but merely makes a new reference to it.  When the last
+reference to the vector goes away, it is finally freed.
+
+   A `IR_String' supports the following operations.
+
+ -- Method on IR_String:  IR_String (IR_Character *chars, int len)
+     Construct a new `IR_String' from CHARS and LEN.  The `IR_string'
+     allocates new memory for its vector and copies the contents of
+     CHARS into it, it does not retain the CHARS pointer.
+
+ -- Method on IR_String:  IR_String (char *chars)
+     Construct a new `IR_String' from the zero-terminated string CHARS.
+     The `IR_string' allocates new memory for its vector and copies the
+     contents of CHARS into it, it does not retain the CHARS pointer.
+
+ -- Method on IR_String:  IR_String (IR_String &str)
+     Construct a new `IR_String' by copying STR.  The new `IR_String'
+     will refer to the same vector as STR, so this is an efficient
+     operation.
+
+ -- Method on IR_String: int len ()
+     Return the number of characters stored in the the `IR_String'.
+
+ -- Method on IR_String: IR_Character operator [] (int i)
+     Return the character at index I.  No bounds checking is performed.
+
+ -- Function: ostream& operator<< (ostream &o, IR_String &str)
+     Print STR to O and return O.
+
+
+File: fire.info,  Node: Base Class,  Next: Literals,  Prev: Primitive Types,  Up: FIRE Reference
+
+4.3 Base Class
+==============
+
+ -- Node: IIR_Root
+     Inherits from:     tree_base_node
+     Inherited by:      IIR_SequentialStatement
+                        IIR_Expression
+                        IIR_Declaration
+                        IIR_Type
+                        IIR_Range
+                        IIR_List
+                        IIR_Tuple
+                        IIR_Literal
+                        IIR_Dummy
+     Referenced by:     none
+     Inherited slots:   none
+     Direct slots:      pIIR_PosInfo pos
+
+     At the root of the FIRE node type hierachy is `IIR_Root'.  It's
+     only slot `pos' can be used to record the source location of a
+     node.
+
+   There two predefined nodes that inherit from `IIR_PosInfo'.  You can
+define additional ones.
+
+ -- Node: IIR_PosInfo
+     Inherits from:     tree_base_node
+     Inherited by:      IIR_PosInfo_Sheet
+                        IIR_PosInfo_TextFile
+     Referenced by:     IIR_Root
+     Inherited slots:   none
+     Direct slots:      none
+
+
+ -- Node: IIR_PosInfo_TextFile
+     Inherits from:     IIR_PosInfo
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   none
+     Direct slots:      const char* file_name
+                        int line_number
+
+     This node represents a position in a text file.  The line numbers
+     start with 1.
+
+ -- Node: IIR_PosInfo_Sheet
+     Inherits from:     IIR_PosInfo
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   none
+     Direct slots:      const char* sheet_name
+                        int x_coordinate
+                        int y_coordinate
+
+     This node represents a position in a 2 dimensional view of a
+     circuit.  The units of the coordinates are undefined as of now.
+
+
+File: fire.info,  Node: Literals,  Next: Tupels,  Prev: Base Class,  Up: FIRE Reference
+
+4.4 Literals
+============
+
+Literals represent tokens of the VHDL text that are not further
+destructured on the grapg level.  They are typically referenced from
+expressions, but they are not themselves expressions.
+
+ -- Node: IIR_Literal
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_AbstractLiteral
+                        IIR_TextLiteral
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_TextLiteral
+     Inherits from:     IIR_Literal
+     Inherited by:      IIR_StringLiteral
+                        IIR_CharacterLiteral
+                        IIR_Identifier
+     Referenced by:     IIR_Declaration
+                        IIR_LibraryUnit
+                        IIR_ArchitectureRef
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      IR_String text
+
+     This is the base node of all literals that have a textual value.
+
+ -- Node: IIR_Identifier
+     Inherits from:     IIR_TextLiteral
+     Inherited by:      none
+     Referenced by:     IIR_IdentifierList
+                        IIR_ConfigurationSpecification
+     Inherited slots:   pIIR_PosInfo pos
+                        IR_String text
+     Direct slots:      none
+
+     This represents the name of a declared item.  It is not directly
+     referenced but indirectly via a `IIR_ObjectReference' that points
+     to the declaration.
+
+ -- Node: IIR_CharacterLiteral
+     Inherits from:     IIR_TextLiteral
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        IR_String text
+     Direct slots:      none
+
+     This is used for names of enumeration literals, which are
+     referenced by `IIR_ObjectReference's, just like `IIR_Identifier's.
+
+ -- Node: IIR_StringLiteral
+     Inherits from:     IIR_TextLiteral
+     Inherited by:      none
+     Referenced by:     IIR_ArrayLiteralExpression
+     Inherited slots:   pIIR_PosInfo pos
+                        IR_String text
+     Direct slots:      none
+
+     This is referenced by a `IIR_ArrayLiteralExpression'.
+
+
+File: fire.info,  Node: Tupels,  Next: Lists,  Prev: Literals,  Up: FIRE Reference
+
+4.5 Tupels
+==========
+
+
+File: fire.info,  Node: Lists,  Next: Type Definitions,  Prev: Tupels,  Up: FIRE Reference
+
+4.6 Lists
+=========
+
+
+File: fire.info,  Node: Type Definitions,  Next: Declarations,  Prev: Lists,  Up: FIRE Reference
+
+4.7 Type Definitions
+====================
+
+
+File: fire.info,  Node: Declarations,  Next: Expressions,  Prev: Type Definitions,  Up: FIRE Reference
+
+4.8 Declarations
+================
+
+
+File: fire.info,  Node: Expressions,  Next: Attributes,  Prev: Declarations,  Up: FIRE Reference
+
+4.9 Expressions
+===============
+
+
+File: fire.info,  Node: Attributes,  Next: Sequential Statements,  Prev: Expressions,  Up: FIRE Reference
+
+4.10 Attributes
+===============
+
+
+File: fire.info,  Node: Sequential Statements,  Next: Concurrent Statements,  Prev: Attributes,  Up: FIRE Reference
+
+4.11 Sequential Statements
+==========================
+
+
+File: fire.info,  Node: Concurrent Statements,  Next: All together now,  Prev: Sequential Statements,  Up: FIRE Reference
+
+4.12 Concurrent Statements
+==========================
+
+
+File: fire.info,  Node: All together now,  Prev: Concurrent Statements,  Up: FIRE Reference
+
+4.13 All together now
+=====================
+
+In alphabetic order.
+
+ -- Node: IIR_ConcurrentGenerateIfStatement
+     Inherits from:     IIR_ConcurrentGenerateStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_ConfigurationSpecificationList
+                        configuration_specifications
+                        pIIR_ConcurrentStatementList concurrent_statement_part
+     Direct slots:      pIIR_Expression condition
+
+
+ -- Node: IIR_ConcurrentGenerateForStatement
+     Inherits from:     IIR_ConcurrentGenerateStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_ConfigurationSpecificationList
+                        configuration_specifications
+                        pIIR_ConcurrentStatementList concurrent_statement_part
+     Direct slots:      pIIR_ConstantDeclaration
+                        generate_parameter_specification
+
+
+ -- Node: IIR_ConcurrentGenerateStatement
+     Inherits from:     IIR_ConcurrentStatement
+     Inherited by:      IIR_ConcurrentGenerateIfStatement
+                        IIR_ConcurrentGenerateForStatement
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_ConfigurationSpecificationList
+                        configuration_specifications
+                        pIIR_ConcurrentStatementList concurrent_statement_part
+
+
+ -- Node: IIR_ComponentInstantiationStatement
+     Inherits from:     IIR_ConcurrentStatement
+     Inherited by:      none
+     Referenced by:     IIR_ComponentInstantiationList
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_BindingIndication binding
+                        pIIR_BindingIndication configuration
+
+
+ -- Node: IIR_SensitizedProcessStatement
+     Inherits from:     IIR_ProcessStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        bool postponed
+                        bool guarded
+                        pIIR_SequentialStatementList process_statement_part
+     Direct slots:      pIIR_ExpressionList sensitivity_list
+
+
+ -- Node: IIR_ImplicitProcessStatement
+     Inherits from:     IIR_ProcessStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        bool postponed
+                        bool guarded
+                        pIIR_SequentialStatementList process_statement_part
+     Direct slots:      none
+
+
+ -- Node: IIR_ProcessStatement
+     Inherits from:     IIR_ConcurrentStatement
+     Inherited by:      IIR_SensitizedProcessStatement
+                        IIR_ImplicitProcessStatement
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      bool postponed
+                        bool guarded
+                        pIIR_SequentialStatementList process_statement_part
+
+
+ -- Node: IIR_BlockStatement
+     Inherits from:     IIR_ConcurrentStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_Expression guard_expression
+                        pIIR_InterfaceList generic_clause
+                        pIIR_AssociationList generic_map_aspect
+                        pIIR_InterfaceList port_clause
+                        pIIR_AssociationList port_map_aspect
+                        pIIR_ConfigurationSpecificationList
+                        configuration_specifications
+                        pIIR_ConcurrentStatementList block_statement_part
+
+
+ -- Node: IIR_ConcurrentStatement
+     Inherits from:     IIR_DeclarativeRegion
+     Inherited by:      IIR_ConcurrentGenerateStatement
+                        IIR_ComponentInstantiationStatement
+                        IIR_ProcessStatement
+                        IIR_BlockStatement
+     Referenced by:     IIR_ConcurrentStatementList
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      none
+
+
+ -- Node: IIR_NullStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      none
+
+
+ -- Node: IIR_ReturnStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_SubprogramDeclaration enclosing_subprogram
+                        pIIR_Expression return_expression
+
+
+ -- Node: IIR_ExitStatement
+     Inherits from:     IIR_LoopControlStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+                        pIIR_LoopStatement loop
+                        pIIR_Expression condition
+     Direct slots:      none
+
+
+ -- Node: IIR_NextStatement
+     Inherits from:     IIR_LoopControlStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+                        pIIR_LoopStatement loop
+                        pIIR_Expression condition
+     Direct slots:      none
+
+
+ -- Node: IIR_LoopControlStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      IIR_ExitStatement
+                        IIR_NextStatement
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_LoopStatement loop
+                        pIIR_Expression condition
+
+
+ -- Node: IIR_WhileLoopStatement
+     Inherits from:     IIR_LoopStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+                        pIIR_SequentialStatementList sequence_of_statements
+                        pIIR_LoopDeclarativeRegion declarative_region
+     Direct slots:      pIIR_Expression condition
+
+
+ -- Node: IIR_ForLoopStatement
+     Inherits from:     IIR_LoopStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+                        pIIR_SequentialStatementList sequence_of_statements
+                        pIIR_LoopDeclarativeRegion declarative_region
+     Direct slots:      pIIR_ConstantDeclaration iterator
+
+
+ -- Node: IIR_LoopStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      IIR_WhileLoopStatement
+                        IIR_ForLoopStatement
+     Referenced by:     IIR_LoopDeclarativeRegion
+                        IIR_LoopControlStatement
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_SequentialStatementList sequence_of_statements
+                        pIIR_LoopDeclarativeRegion declarative_region
+
+
+ -- Node: IIR_CaseStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_Expression expression
+                        pIIR_CaseStatementAlternativeList
+                        case_statement_alternatives
+
+
+ -- Node: IIR_IfStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_Expression condition
+                        pIIR_SequentialStatementList then_sequence
+                        pIIR_SequentialStatementList else_sequence
+
+
+ -- Node: IIR_ProcedureCallStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_ProcedureDeclaration procedure
+                        pIIR_AssociationList actual_parameter_part
+
+
+ -- Node: IIR_VariableAssignmentStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_Expression target
+                        pIIR_Expression expression
+
+
+ -- Node: IIR_SignalAssignmentStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_Expression target
+                        IR_DelayMechanism delay_mechanism
+                        pIIR_Expression reject_time_expression
+                        pIIR_WaveformList waveform
+
+
+ -- Node: IIR_ReportStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_Expression report_expression
+                        pIIR_Expression severity_expression
+
+
+ -- Node: IIR_AssertionStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_Expression assertion_condition
+                        pIIR_Expression report_expression
+                        pIIR_Expression severity_expression
+
+
+ -- Node: IIR_WaitStatement
+     Inherits from:     IIR_SequentialStatement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Label label
+     Direct slots:      pIIR_Expression condition_clause
+                        pIIR_Expression timeout_clause
+                        pIIR_ExpressionList sensitivity_list
+
+
+ -- Node: IIR_SequentialStatement
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_NullStatement
+                        IIR_ReturnStatement
+                        IIR_LoopControlStatement
+                        IIR_LoopStatement
+                        IIR_CaseStatement
+                        IIR_IfStatement
+                        IIR_ProcedureCallStatement
+                        IIR_VariableAssignmentStatement
+                        IIR_SignalAssignmentStatement
+                        IIR_ReportStatement
+                        IIR_AssertionStatement
+                        IIR_WaitStatement
+     Referenced by:     IIR_SequentialStatementList
+                        IIR_Label
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Label label
+
+
+ -- Node: IIR_Attr_ArrayLENGTH
+     Inherits from:     IIR_AttrArrayFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        int index
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_ArrayASCENDING
+     Inherits from:     IIR_AttrArrayFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        int index
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_ArrayLOW
+     Inherits from:     IIR_AttrArrayFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        int index
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_ArrayHIGH
+     Inherits from:     IIR_AttrArrayFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        int index
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_ArrayRIGHT
+     Inherits from:     IIR_AttrArrayFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        int index
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_ArrayLEFT
+     Inherits from:     IIR_AttrArrayFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        int index
+     Direct slots:      none
+
+
+ -- Node: IIR_AttrArrayFunc
+     Inherits from:     IIR_FunctionAttr
+     Inherited by:      IIR_Attr_ArrayLENGTH
+                        IIR_Attr_ArrayASCENDING
+                        IIR_Attr_ArrayLOW
+                        IIR_Attr_ArrayHIGH
+                        IIR_Attr_ArrayRIGHT
+                        IIR_Attr_ArrayLEFT
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Expression array
+                        pIIR_Type array_type
+                        int index
+
+
+ -- Node: IIR_Attr_RIGHTOF
+     Inherits from:     IIR_AttrTypeFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_LEFTOF
+     Inherits from:     IIR_AttrTypeFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_PRED
+     Inherits from:     IIR_AttrTypeFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_SUCC
+     Inherits from:     IIR_AttrTypeFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_VAL
+     Inherits from:     IIR_AttrTypeFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_POS
+     Inherits from:     IIR_AttrTypeFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_VALUE
+     Inherits from:     IIR_AttrTypeFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_IMAGE
+     Inherits from:     IIR_AttrTypeFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_AttrTypeFunc
+     Inherits from:     IIR_FunctionAttr
+     Inherited by:      IIR_Attr_RIGHTOF
+                        IIR_Attr_LEFTOF
+                        IIR_Attr_PRED
+                        IIR_Attr_SUCC
+                        IIR_Attr_VAL
+                        IIR_Attr_POS
+                        IIR_Attr_VALUE
+                        IIR_Attr_IMAGE
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Type prefix
+                        pIIR_Expression argument
+
+
+ -- Node: IIR_Attr_LENGTH
+     Inherits from:     IIR_AttrTypeValue
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_ASCENDING
+     Inherits from:     IIR_AttrTypeValue
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_HIGH
+     Inherits from:     IIR_AttrTypeValue
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_LOW
+     Inherits from:     IIR_AttrTypeValue
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_RIGHT
+     Inherits from:     IIR_AttrTypeValue
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_LEFT
+     Inherits from:     IIR_AttrTypeValue
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Type prefix
+                        pIIR_Expression argument
+     Direct slots:      none
+
+
+ -- Node: IIR_AttrTypeValue
+     Inherits from:     IIR_ValueAttr
+     Inherited by:      IIR_Attr_LENGTH
+                        IIR_Attr_ASCENDING
+                        IIR_Attr_HIGH
+                        IIR_Attr_LOW
+                        IIR_Attr_RIGHT
+                        IIR_Attr_LEFT
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Type prefix
+                        pIIR_Expression argument
+
+
+ -- Node: IIR_ValueAttr
+     Inherits from:     IIR_Expression
+     Inherited by:      IIR_AttrTypeValue
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_DRIVING_VALUE
+     Inherits from:     IIR_AttrSigFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_DRIVING
+     Inherits from:     IIR_AttrSigFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_LAST_VALUE
+     Inherits from:     IIR_AttrSigFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_LAST_ACTIVE
+     Inherits from:     IIR_AttrSigFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_LAST_EVENT
+     Inherits from:     IIR_AttrSigFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_ACTIVE
+     Inherits from:     IIR_AttrSigFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_EVENT
+     Inherits from:     IIR_AttrSigFunc
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      none
+
+
+ -- Node: IIR_AttrSigFunc
+     Inherits from:     IIR_FunctionAttr
+     Inherited by:      IIR_Attr_DRIVING_VALUE
+                        IIR_Attr_DRIVING
+                        IIR_Attr_LAST_VALUE
+                        IIR_Attr_LAST_ACTIVE
+                        IIR_Attr_LAST_EVENT
+                        IIR_Attr_ACTIVE
+                        IIR_Attr_EVENT
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_ObjectReference signal
+
+
+ -- Node: IIR_FunctionAttr
+     Inherits from:     IIR_Expression
+     Inherited by:      IIR_AttrArrayFunc
+                        IIR_AttrTypeFunc
+                        IIR_AttrSigFunc
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_TRANSACTION
+     Inherits from:     IIR_SignalAttr
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_QUIET
+     Inherits from:     IIR_SignalAttr
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      pIIR_Expression duration
+
+
+ -- Node: IIR_Attr_STABLE
+     Inherits from:     IIR_SignalAttr
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      pIIR_Expression duration
+
+
+ -- Node: IIR_Attr_DELAYED
+     Inherits from:     IIR_SignalAttr
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ObjectReference signal
+     Direct slots:      pIIR_Expression delay
+
+
+ -- Node: IIR_SignalAttr
+     Inherits from:     IIR_ObjectReference
+     Inherited by:      IIR_Attr_TRANSACTION
+                        IIR_Attr_QUIET
+                        IIR_Attr_STABLE
+                        IIR_Attr_DELAYED
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_ObjectReference signal
+
+
+ -- Node: IIR_SliceReference
+     Inherits from:     IIR_GenericArrayReference
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Expression array
+     Direct slots:      pIIR_Range range
+
+
+ -- Node: IIR_ArrayReference
+     Inherits from:     IIR_GenericArrayReference
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_Expression array
+     Direct slots:      pIIR_ExpressionList indices
+
+
+ -- Node: IIR_GenericArrayReference
+     Inherits from:     IIR_ObjectReference
+     Inherited by:      IIR_SliceReference
+                        IIR_ArrayReference
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Expression array
+
+
+ -- Node: IIR_RecordReference
+     Inherits from:     IIR_ObjectReference
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Expression record
+                        pIIR_ElementDeclaration element
+
+
+ -- Node: IIR_AccessReference
+     Inherits from:     IIR_ObjectReference
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Expression access
+
+
+ -- Node: IIR_SimpleReference
+     Inherits from:     IIR_ObjectReference
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_ObjectDeclaration object
+
+
+ -- Node: IIR_ObjectReference
+     Inherits from:     IIR_Expression
+     Inherited by:      IIR_SignalAttr
+                        IIR_GenericArrayReference
+                        IIR_RecordReference
+                        IIR_AccessReference
+                        IIR_SimpleReference
+     Referenced by:     IIR_AssociationElement
+                        IIR_ObjectDeclaration
+                        IIR_DisconnectSpecification
+                        IIR_SignalAttr
+                        IIR_AttrSigFunc
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_OpenExpression
+     Inherits from:     IIR_Expression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_Allocator
+     Inherits from:     IIR_Expression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Type type_mark
+                        pIIR_Expression value
+
+
+ -- Node: IIR_TypeConversion
+     Inherits from:     IIR_Expression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Type type_mark
+                        pIIR_Expression expression
+
+
+ -- Node: IIR_QualifiedExpression
+     Inherits from:     IIR_Expression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Type type_mark
+                        pIIR_Expression expression
+
+
+ -- Node: IIR_FunctionCall
+     Inherits from:     IIR_Expression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_FunctionDeclaration function
+                        pIIR_AssociationList parameter_association_list
+
+
+ -- Node: IIR_ArtificialArrayAggregate
+     Inherits from:     IIR_ArrayAggregate
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_IndexedAssociationList indexed_association_list
+     Direct slots:      none
+
+
+ -- Node: IIR_ArrayAggregate
+     Inherits from:     IIR_Aggregate
+     Inherited by:      IIR_ArtificialArrayAggregate
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_IndexedAssociationList indexed_association_list
+
+
+ -- Node: IIR_ArtificialRecordAggregate
+     Inherits from:     IIR_RecordAggregate
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_ElementAssociationList element_association_list
+     Direct slots:      none
+
+
+ -- Node: IIR_RecordAggregate
+     Inherits from:     IIR_Aggregate
+     Inherited by:      IIR_ArtificialRecordAggregate
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_ElementAssociationList element_association_list
+
+
+ -- Node: IIR_Aggregate
+     Inherits from:     IIR_Expression
+     Inherited by:      IIR_ArrayAggregate
+                        IIR_RecordAggregate
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_NullExpression
+     Inherits from:     IIR_Expression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_EnumLiteralReference
+     Inherits from:     IIR_Expression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_EnumerationLiteral value
+
+
+ -- Node: IIR_ArrayLiteralExpression
+     Inherits from:     IIR_Expression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_StringLiteral value
+
+
+ -- Node: IIR_PhysicalLiteral
+     Inherits from:     IIR_AbstractLiteralExpression
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+                        pIIR_AbstractLiteral value
+     Direct slots:      pIIR_PhysicalUnit unit
+
+
+ -- Node: IIR_AbstractLiteralExpression
+     Inherits from:     IIR_Expression
+     Inherited by:      IIR_PhysicalLiteral
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type subtype
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_AbstractLiteral value
+
+
+ -- Node: IIR_Expression
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_ValueAttr
+                        IIR_FunctionAttr
+                        IIR_ObjectReference
+                        IIR_OpenExpression
+                        IIR_Allocator
+                        IIR_TypeConversion
+                        IIR_QualifiedExpression
+                        IIR_FunctionCall
+                        IIR_Aggregate
+                        IIR_NullExpression
+                        IIR_EnumLiteralReference
+                        IIR_ArrayLiteralExpression
+                        IIR_AbstractLiteralExpression
+     Referenced by:     IIR_AssociationElement
+                        IIR_ChoiceByExpression
+                        IIR_WaveformElement
+                        IIR_WaveformElement
+                        IIR_ElementAssociation
+                        IIR_IndexedAssociation
+                        IIR_SingleIndexedAssociation
+                        IIR_AttributeValue
+                        IIR_ExpressionList
+                        IIR_ExplicitRange
+                        IIR_ExplicitRange
+                        IIR_ArrayRange
+                        IIR_ArrayRange
+                        IIR_ObjectDeclaration
+                        IIR_FileDeclaration
+                        IIR_FileDeclaration
+                        IIR_PhysicalUnit
+                        IIR_DisconnectSpecification
+                        IIR_QualifiedExpression
+                        IIR_TypeConversion
+                        IIR_Allocator
+                        IIR_AccessReference
+                        IIR_RecordReference
+                        IIR_GenericArrayReference
+                        IIR_Attr_DELAYED
+                        IIR_Attr_STABLE
+                        IIR_Attr_QUIET
+                        IIR_AttrTypeValue
+                        IIR_AttrTypeFunc
+                        IIR_AttrArrayFunc
+                        IIR_WaitStatement
+                        IIR_WaitStatement
+                        IIR_AssertionStatement
+                        IIR_AssertionStatement
+                        IIR_AssertionStatement
+                        IIR_ReportStatement
+                        IIR_ReportStatement
+                        IIR_SignalAssignmentStatement
+                        IIR_SignalAssignmentStatement
+                        IIR_VariableAssignmentStatement
+                        IIR_VariableAssignmentStatement
+                        IIR_IfStatement
+                        IIR_CaseStatement
+                        IIR_WhileLoopStatement
+                        IIR_LoopControlStatement
+                        IIR_ReturnStatement
+                        IIR_BlockStatement
+                        IIR_ConcurrentGenerateIfStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Type subtype
+                        IR_StaticLevel static_level
+
+
+ -- Node: IIR_UseClause
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_Declaration used_unit
+
+
+ -- Node: IIR_LibraryClause
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      none
+
+
+ -- Node: IIR_Label
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     IIR_SequentialStatement
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_SequentialStatement statement
+
+
+ -- Node: IIR_DisconnectSpecification
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_Type type_mark
+                        pIIR_Expression time_expression
+                        pIIR_ObjectReference guarded_signal
+
+
+ -- Node: IIR_ConfigurationSpecification
+     Inherits from:     IIR_Tuple
+     Inherited by:      none
+     Referenced by:     IIR_ConfigurationSpecificationList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Identifier label
+                        pIIR_ComponentDeclaration component
+                        pIIR_BindingIndication binding
+
+
+ -- Node: IIR_BindingIndication
+     Inherits from:     IIR_Tuple
+     Inherited by:      none
+     Referenced by:     IIR_ConfigurationSpecification
+                        IIR_ComponentInstantiationStatement
+                        IIR_ComponentInstantiationStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_DeclarativeRegion unit
+                        pIIR_AssociationList generic_map_list
+                        pIIR_AssociationList port_map_list
+
+
+ -- Node: IIR_PhysicalUnit
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     IIR_UnitList
+                        IIR_PhysicalType
+                        IIR_PhysicalUnit
+                        IIR_PhysicalLiteral
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_Expression multiplier
+                        pIIR_PhysicalUnit unit_name
+                        pIIR_PhysicalType type
+                        int unit_pos
+
+
+ -- Node: IIR_ComponentConfiguration
+     Inherits from:     IIR_ConfigurationItem
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_LibraryUnit entity_aspect
+                        pIIR_ComponentInstantiationList instantiation_list
+                        pIIR_AssociationList generic_map_aspect
+                        pIIR_AssociationList port_map_aspect
+                        pIIR_BlockConfiguration block_config
+
+
+ -- Node: IIR_BlockConfiguration
+     Inherits from:     IIR_ConfigurationItem
+     Inherited by:      none
+     Referenced by:     IIR_ConfigurationDeclaration
+                        IIR_ComponentConfiguration
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_DeclarativeRegion block_specification
+                        pIIR_DeclarationList use_clause_list
+                        pIIR_ConfigurationItemList configuration_item_list
+
+
+ -- Node: IIR_ConfigurationItem
+     Inherits from:     IIR_DeclarativeRegion
+     Inherited by:      IIR_ComponentConfiguration
+                        IIR_BlockConfiguration
+     Referenced by:     IIR_ConfigurationItemList
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      none
+
+
+ -- Node: IIR_ConfigurationDeclaration
+     Inherits from:     IIR_LibraryUnit
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_DeclarationList context_items
+                        pIIR_DeclarationList external_decls
+                        pIIR_TextLiteral library_name
+                        pIIR_LibraryUnitList used_units
+     Direct slots:      pIIR_BlockConfiguration block_configuration
+                        pIIR_EntityDeclaration entity
+
+
+ -- Node: IIR_PackageBodyDeclaration
+     Inherits from:     IIR_LibraryUnit
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_DeclarationList context_items
+                        pIIR_DeclarationList external_decls
+                        pIIR_TextLiteral library_name
+                        pIIR_LibraryUnitList used_units
+     Direct slots:      pIIR_PackageDeclaration package
+
+
+ -- Node: IIR_PackageDeclaration
+     Inherits from:     IIR_LibraryUnit
+     Inherited by:      none
+     Referenced by:     IIR_PackageBodyDeclaration
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_DeclarationList context_items
+                        pIIR_DeclarationList external_decls
+                        pIIR_TextLiteral library_name
+                        pIIR_LibraryUnitList used_units
+     Direct slots:      none
+
+
+ -- Node: IIR_ArchitectureRef
+     Inherits from:     IIR_DeclarativeRegion
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_EntityDeclaration entity
+                        pIIR_TextLiteral architecture_name
+
+
+ -- Node: IIR_ArchitectureDeclaration
+     Inherits from:     IIR_LibraryUnit
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_DeclarationList context_items
+                        pIIR_DeclarationList external_decls
+                        pIIR_TextLiteral library_name
+                        pIIR_LibraryUnitList used_units
+     Direct slots:      pIIR_EntityDeclaration entity
+                        pIIR_ConfigurationSpecificationList
+                        configuration_specifications
+                        pIIR_ConcurrentStatementList
+                        architecture_statement_part
+
+
+ -- Node: IIR_EntityDeclaration
+     Inherits from:     IIR_LibraryUnit
+     Inherited by:      none
+     Referenced by:     IIR_ArchitectureDeclaration
+                        IIR_ArchitectureRef
+                        IIR_ConfigurationDeclaration
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_DeclarationList context_items
+                        pIIR_DeclarationList external_decls
+                        pIIR_TextLiteral library_name
+                        pIIR_LibraryUnitList used_units
+     Direct slots:      pIIR_InterfaceList generic_clause
+                        pIIR_InterfaceList port_clause
+                        pIIR_ConcurrentStatementList entity_statement_part
+
+
+ -- Node: IIR_LibraryUnit
+     Inherits from:     IIR_DeclarativeRegion
+     Inherited by:      IIR_ConfigurationDeclaration
+                        IIR_PackageBodyDeclaration
+                        IIR_PackageDeclaration
+                        IIR_ArchitectureDeclaration
+                        IIR_EntityDeclaration
+     Referenced by:     IIR_LibraryUnitList
+                        IIR_ComponentConfiguration
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_DeclarationList context_items
+                        pIIR_DeclarationList external_decls
+                        pIIR_TextLiteral library_name
+                        pIIR_LibraryUnitList used_units
+
+
+ -- Node: IIR_LibraryDeclaration
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_LibraryUnitList primary_units
+
+
+ -- Node: IIR_ComponentDeclaration
+     Inherits from:     IIR_DeclarativeRegion
+     Inherited by:      none
+     Referenced by:     IIR_ConfigurationSpecification
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_InterfaceList local_generic_clause
+                        pIIR_InterfaceList local_port_clause
+
+
+ -- Node: IIR_AttributeDeclaration
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     IIR_AttributeValue
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_Type subtype
+
+
+ -- Node: IIR_FileInterfaceDeclaration
+     Inherits from:     IIR_InterfaceDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+                        IR_Mode mode
+                        bool bus
+     Direct slots:      none
+
+
+ -- Node: IIR_SignalInterfaceDeclaration
+     Inherits from:     IIR_InterfaceDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+                        IR_Mode mode
+                        bool bus
+     Direct slots:      IR_SignalKind signal_kind
+
+
+ -- Node: IIR_VariableInterfaceDeclaration
+     Inherits from:     IIR_InterfaceDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+                        IR_Mode mode
+                        bool bus
+     Direct slots:      none
+
+
+ -- Node: IIR_ConstantInterfaceDeclaration
+     Inherits from:     IIR_InterfaceDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+                        IR_Mode mode
+                        bool bus
+     Direct slots:      none
+
+
+ -- Node: IIR_InterfaceDeclaration
+     Inherits from:     IIR_ObjectDeclaration
+     Inherited by:      IIR_FileInterfaceDeclaration
+                        IIR_SignalInterfaceDeclaration
+                        IIR_VariableInterfaceDeclaration
+                        IIR_ConstantInterfaceDeclaration
+     Referenced by:     IIR_AssociationElement
+                        IIR_InterfaceList
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+     Direct slots:      IR_Mode mode
+                        bool bus
+
+
+ -- Node: IIR_FileDeclaration
+     Inherits from:     IIR_ObjectDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+     Direct slots:      pIIR_Expression file_open_expression
+                        pIIR_Expression file_logical_name
+
+
+ -- Node: IIR_SignalDeclaration
+     Inherits from:     IIR_ObjectDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+     Direct slots:      IR_SignalKind signal_kind
+
+
+ -- Node: IIR_SharedVariableDeclaration
+     Inherits from:     IIR_VariableDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+     Direct slots:      none
+
+
+ -- Node: IIR_VariableDeclaration
+     Inherits from:     IIR_ObjectDeclaration
+     Inherited by:      IIR_SharedVariableDeclaration
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+     Direct slots:      none
+
+
+ -- Node: IIR_ConstantDeclaration
+     Inherits from:     IIR_ObjectDeclaration
+     Inherited by:      none
+     Referenced by:     IIR_ForLoopStatement
+                        IIR_ConcurrentGenerateForStatement
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+     Direct slots:      none
+
+
+ -- Node: IIR_ObjectDeclaration
+     Inherits from:     IIR_Declaration
+     Inherited by:      IIR_InterfaceDeclaration
+                        IIR_FileDeclaration
+                        IIR_SignalDeclaration
+                        IIR_VariableDeclaration
+                        IIR_ConstantDeclaration
+     Referenced by:     IIR_SimpleReference
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_Type subtype
+                        pIIR_Expression initial_value
+                        pIIR_ObjectReference alias_base
+
+
+ -- Node: IIR_SubtypeDeclaration
+     Inherits from:     IIR_TypeDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_Type type
+     Direct slots:      none
+
+
+ -- Node: IIR_TypeDeclaration
+     Inherits from:     IIR_Declaration
+     Inherited by:      IIR_SubtypeDeclaration
+     Referenced by:     IIR_Type
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_Type type
+
+
+ -- Node: IIR_ElementDeclaration
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     IIR_ElementAssociation
+                        IIR_ElementDeclarationList
+                        IIR_RecordReference
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_Type subtype
+                        int declaration_pos
+
+
+ -- Node: IIR_EnumerationLiteral
+     Inherits from:     IIR_Declaration
+     Inherited by:      none
+     Referenced by:     IIR_EnumerationLiteralList
+                        IIR_EnumLiteralReference
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_EnumerationType subtype
+                        int enum_pos
+
+
+ -- Node: IIR_PredefinedFunctionDeclaration
+     Inherits from:     IIR_FunctionDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_InterfaceList interface_declarations
+                        pIIR_SequentialStatementList subprogram_body
+                        pIIR_SubprogramDeclaration prototype
+                        bool pure
+                        pIIR_Type return_type
+     Direct slots:      none
+
+
+ -- Node: IIR_FunctionDeclaration
+     Inherits from:     IIR_SubprogramDeclaration
+     Inherited by:      IIR_PredefinedFunctionDeclaration
+     Referenced by:     IIR_Subtype
+                        IIR_FunctionCall
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_InterfaceList interface_declarations
+                        pIIR_SequentialStatementList subprogram_body
+                        pIIR_SubprogramDeclaration prototype
+     Direct slots:      bool pure
+                        pIIR_Type return_type
+
+
+ -- Node: IIR_PredefinedProcedureDeclaration
+     Inherits from:     IIR_ProcedureDeclaration
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_InterfaceList interface_declarations
+                        pIIR_SequentialStatementList subprogram_body
+                        pIIR_SubprogramDeclaration prototype
+     Direct slots:      none
+
+
+ -- Node: IIR_ProcedureDeclaration
+     Inherits from:     IIR_SubprogramDeclaration
+     Inherited by:      IIR_PredefinedProcedureDeclaration
+     Referenced by:     IIR_ProcedureCallStatement
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+                        pIIR_InterfaceList interface_declarations
+                        pIIR_SequentialStatementList subprogram_body
+                        pIIR_SubprogramDeclaration prototype
+     Direct slots:      none
+
+
+ -- Node: IIR_SubprogramDeclaration
+     Inherits from:     IIR_DeclarativeRegion
+     Inherited by:      IIR_FunctionDeclaration
+                        IIR_ProcedureDeclaration
+     Referenced by:     IIR_SubprogramDeclaration
+                        IIR_ReturnStatement
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_InterfaceList interface_declarations
+                        pIIR_SequentialStatementList subprogram_body
+                        pIIR_SubprogramDeclaration prototype
+
+
+ -- Node: IIR_LoopDeclarativeRegion
+     Inherits from:     IIR_DeclarativeRegion
+     Inherited by:      none
+     Referenced by:     IIR_LoopStatement
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+                        pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+     Direct slots:      pIIR_LoopStatement loop_statement
+
+
+ -- Node: IIR_DeclarativeRegion
+     Inherits from:     IIR_Declaration
+     Inherited by:      IIR_ConcurrentStatement
+                        IIR_ConfigurationItem
+                        IIR_ArchitectureRef
+                        IIR_LibraryUnit
+                        IIR_ComponentDeclaration
+                        IIR_SubprogramDeclaration
+                        IIR_LoopDeclarativeRegion
+     Referenced by:     IIR_Declaration
+                        IIR_DeclarativeRegion
+                        IIR_BlockConfiguration
+                        IIR_BindingIndication
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+     Direct slots:      pIIR_DeclarativeRegion continued
+                        pIIR_DeclarationList declarations
+
+
+ -- Node: IIR_Declaration
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_UseClause
+                        IIR_LibraryClause
+                        IIR_Label
+                        IIR_DisconnectSpecification
+                        IIR_PhysicalUnit
+                        IIR_LibraryDeclaration
+                        IIR_AttributeDeclaration
+                        IIR_ObjectDeclaration
+                        IIR_TypeDeclaration
+                        IIR_ElementDeclaration
+                        IIR_EnumerationLiteral
+                        IIR_DeclarativeRegion
+     Referenced by:     IIR_AssociationElement
+                        IIR_AssociationElement
+                        IIR_DeclarationList
+                        IIR_UseClause
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_TextLiteral declarator
+                        pIIR_DeclarativeRegion declarative_region
+                        pIIR_AttributeValueList attributes
+                        int seqno
+
+
+ -- Node: IIR_ArraySubtype
+     Inherits from:     IIR_Subtype
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+                        pIIR_Type immediate_base
+                        pIIR_FunctionDeclaration resolution_function
+     Direct slots:      pIIR_TypeList constraint
+
+
+ -- Node: IIR_ArrayType
+     Inherits from:     IIR_CompositeType
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_TypeList index_types
+                        pIIR_Type element_type
+
+
+ -- Node: IIR_FileType
+     Inherits from:     IIR_Type
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Type type_mark
+
+
+ -- Node: IIR_AccessType
+     Inherits from:     IIR_Type
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Type designated_type
+
+
+ -- Node: IIR_RecordSubtype
+     Inherits from:     IIR_Subtype
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+                        pIIR_Type immediate_base
+                        pIIR_FunctionDeclaration resolution_function
+     Direct slots:      none
+
+
+ -- Node: IIR_RecordType
+     Inherits from:     IIR_CompositeType
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_ElementDeclarationList element_declarations
+
+
+ -- Node: IIR_CompositeType
+     Inherits from:     IIR_Type
+     Inherited by:      IIR_ArrayType
+                        IIR_RecordType
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_PhysicalType
+     Inherits from:     IIR_ScalarType
+     Inherited by:      none
+     Referenced by:     IIR_PhysicalUnit
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_PhysicalUnit primary_unit
+                        pIIR_UnitList units
+
+
+ -- Node: IIR_FloatingType
+     Inherits from:     IIR_ScalarType
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_IntegerType
+     Inherits from:     IIR_ScalarType
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_EnumerationType
+     Inherits from:     IIR_ScalarType
+     Inherited by:      none
+     Referenced by:     IIR_EnumerationLiteral
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_EnumerationLiteralList enumeration_literals
+
+
+ -- Node: IIR_ScalarSubtype
+     Inherits from:     IIR_Subtype
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+                        pIIR_Type immediate_base
+                        pIIR_FunctionDeclaration resolution_function
+     Direct slots:      pIIR_Range range
+
+
+ -- Node: IIR_ScalarType
+     Inherits from:     IIR_Type
+     Inherited by:      IIR_PhysicalType
+                        IIR_FloatingType
+                        IIR_IntegerType
+                        IIR_EnumerationType
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      none
+
+
+ -- Node: IIR_Subtype
+     Inherits from:     IIR_Type
+     Inherited by:      IIR_ArraySubtype
+                        IIR_RecordSubtype
+                        IIR_ScalarSubtype
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+     Direct slots:      pIIR_Type immediate_base
+                        pIIR_FunctionDeclaration resolution_function
+
+
+ -- Node: IIR_Type
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_FileType
+                        IIR_AccessType
+                        IIR_CompositeType
+                        IIR_ScalarType
+                        IIR_Subtype
+     Referenced by:     IIR_TypeList
+                        IIR_ArrayRange
+                        IIR_ArrayRange
+                        IIR_Type
+                        IIR_Subtype
+                        IIR_AccessType
+                        IIR_FileType
+                        IIR_ArrayType
+                        IIR_FunctionDeclaration
+                        IIR_ElementDeclaration
+                        IIR_TypeDeclaration
+                        IIR_ObjectDeclaration
+                        IIR_AttributeDeclaration
+                        IIR_DisconnectSpecification
+                        IIR_Expression
+                        IIR_QualifiedExpression
+                        IIR_TypeConversion
+                        IIR_Allocator
+                        IIR_AttrTypeValue
+                        IIR_AttrTypeFunc
+                        IIR_AttrArrayFunc
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_TypeDeclaration declaration
+                        pIIR_Type base
+                        IR_StaticLevel static_level
+
+
+ -- Node: IIR_Attr_ArrayREVERSE_RANGE
+     Inherits from:     IIR_ArrayRange
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type type
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        pIIR_Expression index
+     Direct slots:      none
+
+
+ -- Node: IIR_Attr_ArrayRANGE
+     Inherits from:     IIR_ArrayRange
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Type type
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        pIIR_Expression index
+     Direct slots:      none
+
+
+ -- Node: IIR_ArrayRange
+     Inherits from:     IIR_Range
+     Inherited by:      IIR_Attr_ArrayREVERSE_RANGE
+                        IIR_Attr_ArrayRANGE
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Type type
+                        pIIR_Expression array
+                        pIIR_Type array_type
+                        pIIR_Expression index
+
+
+ -- Node: IIR_ExplicitRange
+     Inherits from:     IIR_Range
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Expression left
+                        pIIR_Expression right
+                        IR_Direction direction
+
+
+ -- Node: IIR_Range
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_ArrayRange
+                        IIR_ExplicitRange
+     Referenced by:     IIR_ChoiceByRange
+                        IIR_RangeIndexedAssociation
+                        IIR_ScalarSubtype
+                        IIR_SliceReference
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_IdentifierList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_IdentifierList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Identifier first
+                        pIIR_IdentifierList rest
+
+
+ -- Node: IIR_ConfigurationSpecificationList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_ConfigurationSpecificationList
+                        IIR_ArchitectureDeclaration
+                        IIR_BlockStatement
+                        IIR_ConcurrentGenerateStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_ConfigurationSpecification first
+                        pIIR_ConfigurationSpecificationList rest
+
+
+ -- Node: IIR_ComponentInstantiationList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_ComponentInstantiationList
+                        IIR_ComponentConfiguration
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_ComponentInstantiationStatement first
+                        pIIR_ComponentInstantiationList rest
+
+
+ -- Node: IIR_ElementAssociationList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_ElementAssociationList
+                        IIR_RecordAggregate
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_ElementAssociation first
+                        pIIR_ElementAssociationList rest
+
+
+ -- Node: IIR_IndexedAssociationList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_IndexedAssociationList
+                        IIR_ArrayAggregate
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_IndexedAssociation first
+                        pIIR_IndexedAssociationList rest
+
+
+ -- Node: IIR_ExpressionList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_ExpressionList
+                        IIR_ArrayReference
+                        IIR_WaitStatement
+                        IIR_SensitizedProcessStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Expression first
+                        pIIR_ExpressionList rest
+
+
+ -- Node: IIR_TypeList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_TypeList
+                        IIR_ArrayType
+                        IIR_ArraySubtype
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Type first
+                        pIIR_TypeList rest
+
+
+ -- Node: IIR_WaveformList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_WaveformList
+                        IIR_SignalAssignmentStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_WaveformElement first
+                        pIIR_WaveformList rest
+
+
+ -- Node: IIR_UnitList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_UnitList
+                        IIR_PhysicalType
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_PhysicalUnit first
+                        pIIR_UnitList rest
+
+
+ -- Node: IIR_SequentialStatementList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_CaseStatementAlternative
+                        IIR_SequentialStatementList
+                        IIR_SubprogramDeclaration
+                        IIR_IfStatement
+                        IIR_IfStatement
+                        IIR_LoopStatement
+                        IIR_ProcessStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_SequentialStatement first
+                        pIIR_SequentialStatementList rest
+
+
+ -- Node: IIR_LibraryUnitList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_LibraryUnitList
+                        IIR_LibraryDeclaration
+                        IIR_LibraryUnit
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_LibraryUnit first
+                        pIIR_LibraryUnitList rest
+
+
+ -- Node: IIR_InterfaceList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_InterfaceList
+                        IIR_SubprogramDeclaration
+                        IIR_ComponentDeclaration
+                        IIR_ComponentDeclaration
+                        IIR_EntityDeclaration
+                        IIR_EntityDeclaration
+                        IIR_BlockStatement
+                        IIR_BlockStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_InterfaceDeclaration first
+                        pIIR_InterfaceList rest
+
+
+ -- Node: IIR_EnumerationLiteralList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_EnumerationLiteralList
+                        IIR_EnumerationType
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_EnumerationLiteral first
+                        pIIR_EnumerationLiteralList rest
+
+
+ -- Node: IIR_EntityClassEntryList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_EntityClassEntryList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_EntityClassEntry first
+                        pIIR_EntityClassEntryList rest
+
+
+ -- Node: IIR_ElementDeclarationList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_ElementDeclarationList
+                        IIR_RecordType
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_ElementDeclaration first
+                        pIIR_ElementDeclarationList rest
+
+
+ -- Node: IIR_DeclarationList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_DeclarationList
+                        IIR_DeclarativeRegion
+                        IIR_LibraryUnit
+                        IIR_LibraryUnit
+                        IIR_BlockConfiguration
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Declaration first
+                        pIIR_DeclarationList rest
+
+
+ -- Node: IIR_ConfigurationItemList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_ConfigurationItemList
+                        IIR_BlockConfiguration
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_ConfigurationItem first
+                        pIIR_ConfigurationItemList rest
+
+
+ -- Node: IIR_ConcurrentStatementList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_ConcurrentStatementList
+                        IIR_EntityDeclaration
+                        IIR_ArchitectureDeclaration
+                        IIR_BlockStatement
+                        IIR_ConcurrentGenerateStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_ConcurrentStatement first
+                        pIIR_ConcurrentStatementList rest
+
+
+ -- Node: IIR_ChoiceList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_CaseStatementAlternative
+                        IIR_ChoiceList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Choice first
+                        pIIR_ChoiceList rest
+
+
+ -- Node: IIR_CaseStatementAlternativeList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_CaseStatementAlternativeList
+                        IIR_CaseStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_CaseStatementAlternative first
+                        pIIR_CaseStatementAlternativeList rest
+
+
+ -- Node: IIR_AttributeValueList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_AttributeValueList
+                        IIR_Declaration
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_AttributeValue first
+                        pIIR_AttributeValueList rest
+
+
+ -- Node: IIR_AssociationList
+     Inherits from:     IIR_List
+     Inherited by:      none
+     Referenced by:     IIR_AssociationList
+                        IIR_ComponentConfiguration
+                        IIR_ComponentConfiguration
+                        IIR_BindingIndication
+                        IIR_BindingIndication
+                        IIR_FunctionCall
+                        IIR_ProcedureCallStatement
+                        IIR_BlockStatement
+                        IIR_BlockStatement
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_AssociationElement first
+                        pIIR_AssociationList rest
+
+
+ -- Node: IIR_List
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_IdentifierList
+                        IIR_ConfigurationSpecificationList
+                        IIR_ComponentInstantiationList
+                        IIR_ElementAssociationList
+                        IIR_IndexedAssociationList
+                        IIR_ExpressionList
+                        IIR_TypeList
+                        IIR_WaveformList
+                        IIR_UnitList
+                        IIR_SequentialStatementList
+                        IIR_LibraryUnitList
+                        IIR_InterfaceList
+                        IIR_EnumerationLiteralList
+                        IIR_EntityClassEntryList
+                        IIR_ElementDeclarationList
+                        IIR_DeclarationList
+                        IIR_ConfigurationItemList
+                        IIR_ConcurrentStatementList
+                        IIR_ChoiceList
+                        IIR_CaseStatementAlternativeList
+                        IIR_AttributeValueList
+                        IIR_AssociationList
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_AttributeValue
+     Inherits from:     IIR_Tuple
+     Inherited by:      none
+     Referenced by:     IIR_AttributeValueList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Expression value
+                        pIIR_AttributeDeclaration attribute
+
+
+ -- Node: IIR_OthersIndexedAssociation
+     Inherits from:     IIR_IndexedAssociation
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Expression value
+     Direct slots:      none
+
+
+ -- Node: IIR_SliceIndexedAssociation
+     Inherits from:     IIR_RangeIndexedAssociation
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Expression value
+                        pIIR_Range index_range
+     Direct slots:      none
+
+
+ -- Node: IIR_RangeIndexedAssociation
+     Inherits from:     IIR_IndexedAssociation
+     Inherited by:      IIR_SliceIndexedAssociation
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Expression value
+     Direct slots:      pIIR_Range index_range
+
+
+ -- Node: IIR_SingleIndexedAssociation
+     Inherits from:     IIR_IndexedAssociation
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_Expression value
+     Direct slots:      pIIR_Expression index
+
+
+ -- Node: IIR_IndexedAssociation
+     Inherits from:     IIR_Tuple
+     Inherited by:      IIR_OthersIndexedAssociation
+                        IIR_RangeIndexedAssociation
+                        IIR_SingleIndexedAssociation
+     Referenced by:     IIR_IndexedAssociationList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Expression value
+
+
+ -- Node: IIR_ElementAssociation
+     Inherits from:     IIR_Tuple
+     Inherited by:      none
+     Referenced by:     IIR_ElementAssociationList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_ElementDeclaration element
+                        pIIR_Expression value
+
+
+ -- Node: IIR_WaveformElement
+     Inherits from:     IIR_Tuple
+     Inherited by:      none
+     Referenced by:     IIR_WaveformList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Expression value
+                        pIIR_Expression time
+
+
+ -- Node: IIR_EntityClassEntry
+     Inherits from:     IIR_Tuple
+     Inherited by:      none
+     Referenced by:     IIR_EntityClassEntryList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      IR_Kind entity_kind
+                        bool is_boxed
+
+
+ -- Node: IIR_ChoiceByOthers
+     Inherits from:     IIR_Choice
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_ChoiceByRange
+     Inherits from:     IIR_Choice
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Range range
+
+
+ -- Node: IIR_ChoiceByExpression
+     Inherits from:     IIR_Choice
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_Expression value
+
+
+ -- Node: IIR_Choice
+     Inherits from:     IIR_Tuple
+     Inherited by:      IIR_ChoiceByOthers
+                        IIR_ChoiceByRange
+                        IIR_ChoiceByExpression
+     Referenced by:     IIR_ChoiceList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_CaseStatementAlternative
+     Inherits from:     IIR_Tuple
+     Inherited by:      none
+     Referenced by:     IIR_CaseStatementAlternativeList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_SequentialStatementList sequence_of_statements
+                        pIIR_ChoiceList choices
+
+
+ -- Node: IIR_AssociationElementOpen
+     Inherits from:     IIR_AssociationElement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_ObjectReference formal
+                        pIIR_InterfaceDeclaration formal_declaration
+                        pIIR_Declaration formal_conversion
+                        pIIR_Expression actual
+                        pIIR_Declaration actual_conversion
+     Direct slots:      none
+
+
+ -- Node: IIR_AssociationElementByExpression
+     Inherits from:     IIR_AssociationElement
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        pIIR_ObjectReference formal
+                        pIIR_InterfaceDeclaration formal_declaration
+                        pIIR_Declaration formal_conversion
+                        pIIR_Expression actual
+                        pIIR_Declaration actual_conversion
+     Direct slots:      none
+
+
+ -- Node: IIR_AssociationElement
+     Inherits from:     IIR_Tuple
+     Inherited by:      IIR_AssociationElementOpen
+                        IIR_AssociationElementByExpression
+     Referenced by:     IIR_AssociationList
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      pIIR_ObjectReference formal
+                        pIIR_InterfaceDeclaration formal_declaration
+                        pIIR_Declaration formal_conversion
+                        pIIR_Expression actual
+                        pIIR_Declaration actual_conversion
+
+
+ -- Node: IIR_Tuple
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_ConfigurationSpecification
+                        IIR_BindingIndication
+                        IIR_AttributeValue
+                        IIR_IndexedAssociation
+                        IIR_ElementAssociation
+                        IIR_WaveformElement
+                        IIR_EntityClassEntry
+                        IIR_Choice
+                        IIR_CaseStatementAlternative
+                        IIR_AssociationElement
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_FloatingPointLiteral
+     Inherits from:     IIR_AbstractLiteral
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      IR_String text
+
+
+ -- Node: IIR_IntegerLiteral
+     Inherits from:     IIR_AbstractLiteral
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      IR_String text
+
+
+ -- Node: IIR_AbstractLiteral
+     Inherits from:     IIR_Literal
+     Inherited by:      IIR_FloatingPointLiteral
+                        IIR_IntegerLiteral
+     Referenced by:     IIR_AbstractLiteralExpression
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_StringLiteral
+     Inherits from:     IIR_TextLiteral
+     Inherited by:      none
+     Referenced by:     IIR_ArrayLiteralExpression
+     Inherited slots:   pIIR_PosInfo pos
+                        IR_String text
+     Direct slots:      none
+
+
+ -- Node: IIR_CharacterLiteral
+     Inherits from:     IIR_TextLiteral
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+                        IR_String text
+     Direct slots:      none
+
+
+ -- Node: IIR_Identifier
+     Inherits from:     IIR_TextLiteral
+     Inherited by:      none
+     Referenced by:     IIR_IdentifierList
+                        IIR_ConfigurationSpecification
+     Inherited slots:   pIIR_PosInfo pos
+                        IR_String text
+     Direct slots:      none
+
+
+ -- Node: IIR_TextLiteral
+     Inherits from:     IIR_Literal
+     Inherited by:      IIR_StringLiteral
+                        IIR_CharacterLiteral
+                        IIR_Identifier
+     Referenced by:     IIR_Declaration
+                        IIR_LibraryUnit
+                        IIR_ArchitectureRef
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      IR_String text
+
+
+ -- Node: IIR_Literal
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_AbstractLiteral
+                        IIR_TextLiteral
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_Signature
+     Inherits from:     IIR_Dummy
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_Dummy
+     Inherits from:     IIR_Root
+     Inherited by:      IIR_Signature
+     Referenced by:     none
+     Inherited slots:   pIIR_PosInfo pos
+     Direct slots:      none
+
+
+ -- Node: IIR_Root
+     Inherits from:     tree_base_node
+     Inherited by:      IIR_SequentialStatement
+                        IIR_Expression
+                        IIR_Declaration
+                        IIR_Type
+                        IIR_Range
+                        IIR_List
+                        IIR_Tuple
+                        IIR_Literal
+                        IIR_Dummy
+     Referenced by:     none
+     Inherited slots:   none
+     Direct slots:      pIIR_PosInfo pos
+
+
+ -- Node: IIR_PosInfo_Sheet
+     Inherits from:     IIR_PosInfo
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   none
+     Direct slots:      const char* sheet_name
+                        int x_coordinate
+                        int y_coordinate
+
+
+ -- Node: IIR_PosInfo_TextFile
+     Inherits from:     IIR_PosInfo
+     Inherited by:      none
+     Referenced by:     none
+     Inherited slots:   none
+     Direct slots:      const char* file_name
+                        int line_number
+
+
+ -- Node: IIR_PosInfo
+     Inherits from:     tree_base_node
+     Inherited by:      IIR_PosInfo_Sheet
+                        IIR_PosInfo_TextFile
+     Referenced by:     IIR_Root
+     Inherited slots:   none
+     Direct slots:      none
+
+
+
+
+Tag Table:
+Node: Top198
+Node: Introduction474
+Ref: Introduction-Footnote-12615
+Node: Types2645
+Ref: Types-Footnote-17763
+Node: Operations7836
+Node: Extending14374
+Node: New Types17107
+Node: Using gen-nodes18125
+Node: Chunks19642
+Node: Invoking gen-nodes21657
+Node: Descriptions22698
+Node: General Syntax23251
+Node: Options25775
+Node: Toplevel Definitions26680
+Node: Defining Primitive Types29590
+Node: Defining Nodes30256
+Node: Defining Generic Functions32327
+Node: Defining Node Extensions35137
+Node: Defining Creators35682
+Node: Defining Unions39325
+Node: Using the Generated Code39729
+Node: Node Structures40760
+Node: Garbage Collection44788
+Node: Generic Functions47584
+Node: FIRE Reference48831
+Ref: FIRE Reference-Footnote-150092
+Node: Overview50111
+Node: Primitive Types60328
+Node: Base Class63327
+Node: Literals65183
+Node: Tupels67355
+Node: Lists67464
+Node: Type Definitions67579
+Node: Declarations67722
+Node: Expressions67863
+Node: Attributes67996
+Node: Sequential Statements68138
+Node: Concurrent Statements68312
+Node: All together now68492
+
+End Tag Table

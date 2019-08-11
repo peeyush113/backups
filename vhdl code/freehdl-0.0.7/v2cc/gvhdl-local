@@ -1,0 +1,279 @@
+#!/usr/bin/perl
+use Socket;
+use strict; 
+
+my $cc = "g++";
+my $libtool = "FREEHDL/libtool";
+my $libtool_options = "--mode=link";
+my $vhdl_source_name = "";
+my $source = "";
+my $includes = "";
+my $cpplibs = "-lm FREEHDL/kernel/libfreehdl-kernel.la FREEHDL/std/libfreehdl-std.la";
+my $vhdl_library = ""; # Library the design entity is compiled into
+my $cpp_options = "-static ";
+my $vhdl_options = "";
+my $no_cpp_compile = 0;
+my $verbose = 0;
+my $use_sockets = 0;
+my $vhdl_libdir = "FREEHDL";
+my $freehdl_root_path="";
+
+# set root path of the FreeHDL system
+sub set_freehdl_root_path {
+  $freehdl_root_path = $ENV{'FREEHDL'};
+  if ($freehdl_root_path ne "") { return; }
+  # if environment variable is not set then test
+  # each parent directory
+  my $path = ".";
+  while (1) {
+    # test whether $path is a valid path
+    if (not -d "$path/") { die "Could not find FreeHDL root path! Please set environment FREEHDL."; }
+    # is there a file named v2cc.libs in the directory?
+    if (not -f "$path/v2cc.libs") { $path = $path . "/.."; next; }
+    # open file and analyze content
+    open INFILE, "$path/v2cc.libs" or die "Could not read $path/v2cc.libs\n";
+    my $text = ""; 
+    while (<INFILE>) { 
+      s/\n//g;
+      $text = $text . " " . $_; 
+    }
+    my $found = 1;
+    if ($text !~ /std\s*:\s*std/i) { $found = 0; }
+    if ($text !~ /ieee\s*:\s*ieee/i) { $found = 0; }
+    close(INFILE);
+    # return result if freehdl root path was found
+    if ($found == 1) { 
+      $freehdl_root_path = $path;
+      return;
+    }
+    # try next path
+    $path = $path . "/..";
+  }
+};
+
+
+sub update {
+  $_ = $_[0];
+  s/FREEHDL/$freehdl_root_path/g;
+  return $_;
+}
+
+
+sub execute_cmd {
+  my $cmd = $_[0];
+  my $label_text = $_[1];
+  my $out_file = $_[2];
+  open(COMMAND, "$cmd 2>&1 |");
+  while (<COMMAND>) {
+    print $out_file, "$label_text$_";
+  }
+  return close(COMMAND)? 0 : 256;
+}
+
+
+# The main program
+sub main {
+  # determine root path of freehdl installation
+  set_freehdl_root_path;
+  print "gvhdl: FreeHDL root path is '$freehdl_root_path'.\n";
+  $includes = "-I $freehdl_root_path";
+  my $MSTREAM;
+  my $PROGRESS_BAR;
+  open(MSTREAM, ">&STDOUT");
+  open(PROGRESS_BAR, ">/dev/null");
+  
+  $cpplibs = update($cpplibs);
+  $libtool = update($libtool);
+  $vhdl_libdir = update($vhdl_libdir);
+
+  my $arg_index = 0;
+  my $do_link = 1;
+  my $create_simulator = 1;
+  my @source_files;
+  my $object_files;
+  while ($arg_index < scalar(@ARGV)) {
+    my $argument = $ARGV[$arg_index];
+    if ($argument =~ /^\-l/) {
+      die "gvhdl: Missing argument for '-l'!\n" if (++$arg_index >= scalar(@ARGV));
+      $vhdl_library = "-l " . $ARGV[$arg_index];
+    } elsif ($argument =~ /^\-C/) {
+      $cc = $ARGV[++$arg_index];
+    } elsif ($argument =~ /^\-FHDLgui/) {
+      # gvhdl will communiate with is caller via 2 sockets. The socket
+      # file names are generated from the base string passed over as a
+      # argument to option FHDLgui. The actual file names are derived
+      # by appending channel number 0 or 4 to the base name. Channel 0
+      # is used for printing messages generated during code
+      # generation/compilation/linking while channel 4 is used to
+      # print progress information.
+      my $socket_base_name = $ARGV[++$arg_index];
+
+      my $socket_name = $socket_base_name . "0";
+      socket(MSTREAM, PF_UNIX, SOCK_STREAM, 0)  || die "socket: $!";
+      connect(MSTREAM, sockaddr_un($socket_name)) || die "connect: $!";
+
+      my $socket_name = $socket_base_name . "4";
+      socket(PROGRESS_BAR, PF_UNIX, SOCK_STREAM, 0)  || die "socket: $!";
+      connect(PROGRESS_BAR, sockaddr_un($socket_name)) || die "connect: $!";
+
+      $use_sockets = 1;
+
+    } elsif ($argument =~ /^\-L/) {
+      $vhdl_libdir .= " -L " . $ARGV[++$arg_index];
+    } elsif ($argument =~ /^\-R/) {
+      $vhdl_options = $vhdl_options . " -R";
+    } elsif ($argument =~ /^\-g/) {
+      $vhdl_options = $vhdl_options . " -g";
+      $cpp_options = $cpp_options . " -g";
+    } elsif ($argument =~ /^\-c/) {
+      $do_link = 0;
+      $create_simulator = 0;
+      $cpp_options = $cpp_options . " -c";
+    } elsif ($argument =~ /^\-G/) {
+      $cpp_options = $cpp_options . " -g";
+    } elsif ($argument =~ /^\-v/) {
+      $verbose = 1;
+    } elsif ($argument =~ /^\-V/) {
+      $vhdl_options = $vhdl_options . " -v";
+    } elsif ($argument =~ /^\-D/) {
+      $vhdl_options = $vhdl_options . " -D";
+    } elsif ($argument =~ /^\--relaxed-component-visibility/) {
+      $vhdl_options = $vhdl_options . " --relaxed-component-visibility";
+    } elsif ($argument =~ /^\--libieee/) {
+	$cpplibs .= " " . update ("FREEHDL/ieee/libieee.la");
+    } elsif ($argument =~ /^\-/) {
+      $cpp_options = $cpp_options . " " . $argument;
+    } else {
+      push @source_files, $argument;
+    }
+    ++$arg_index;
+  }
+
+
+  my $steps = scalar(@source_files);
+  if ($no_cpp_compile == 0) { $steps *= 2; }
+  if ($do_link == 1) { $steps += 1; }
+  $steps = int(99 / $steps);
+  my $progress_value = 0;
+
+  ##############################################################
+  # Create name for main file
+  ##############################################################
+  my $main_file_name;
+  my $main_vhdl_file;
+  if ($create_simulator == 1) {
+    $_ = $source_files [0];
+    if ($_ =~ /\.vhdl$/) { $main_vhdl_file = $_; }
+    s/\.[^\.]*$/\._main_/i;
+    $main_file_name = $_;
+  }
+
+  ##############################################################
+  # process each source file 
+  ##############################################################
+  foreach $vhdl_source_name (@source_files) {
+    # skip object (*.o) files
+    if ($vhdl_source_name =~ /\.o$/) { 
+      $object_files = $object_files . " " . $vhdl_source_name;
+      next;
+    }
+    # skip object (*.a) files
+    if ($vhdl_source_name =~ /\.a$/) { 
+      $object_files = $object_files . " " . $vhdl_source_name;
+      next;
+    }
+    ##############################################################
+    # Comiling vhdl -> cc
+    ##############################################################
+    $_ = $vhdl_source_name;
+    s/\.[^\.]*$/\.cc/i;
+    my $out_file_name = $_;
+  
+    my $cmd;
+    if ($create_simulator == 1 && 
+	$main_vhdl_file == $vhdl_source_name) {
+      $cmd = "$freehdl_root_path/v2cc/freehdl-v2cc -m $main_file_name.cc -L $vhdl_libdir $vhdl_library $vhdl_options -o $out_file_name $vhdl_source_name";
+    } else {
+      $cmd = "$freehdl_root_path/v2cc/freehdl-v2cc -L $vhdl_libdir $vhdl_library $vhdl_options -o $out_file_name $vhdl_source_name";
+    }
+    print MSTREAM "gvhdl: executing '$cmd'\n";
+    if (execute_cmd ($cmd, "", $MSTREAM)/256 != 0) {
+      print MSTREAM "gvhdl: Compilation failed!\n";
+      print PROGRESS_BAR "99";
+      die;
+    }
+
+    $progress_value = int($progress_value + $steps);
+    print PROGRESS_BAR $progress_value;
+
+    ##############################################################
+    # Comiling cc -> o
+    ##############################################################
+    $_ = $out_file_name;
+    s/\.[^\.]*/\.o/i;
+    $object_files .= " " . $_;
+    
+    if ($no_cpp_compile == 0) {
+      my $cmd = "$cc $cpp_options $includes -c $out_file_name";
+      print MSTREAM "gvhdl:\n";
+      print MSTREAM "gvhdl: ================================\n";
+      print MSTREAM "gvhdl: Compiling '$out_file_name'...\n";
+      print MSTREAM "gvhdl: ================================\n";
+      print MSTREAM "gvhdl: $cmd\n";
+      if (execute_cmd ($cmd, "c++: ", $MSTREAM)/256 != 0) {
+	print MSTREAM "gvhdl: Compilation failed!\n";
+	print PROGRESS_BAR "99";
+	die;
+      }
+
+      $progress_value = int($progress_value + $steps);
+      print PROGRESS_BAR $progress_value;
+    }
+  }
+
+  ##############################################################
+  # Comiling main cc file -> o
+  ##############################################################
+  if ($create_simulator == 1) {
+    my $out_file_name = $main_file_name . ".cc";
+    my $cmd = "$cc $cpp_options $includes -c $out_file_name";
+    print MSTREAM "gvhdl:\n";
+    print MSTREAM "gvhdl: ================================\n";
+    print MSTREAM "gvhdl: Compiling simulator main file '$out_file_name'...\n";
+    print MSTREAM "gvhdl: ================================\n";
+    print MSTREAM "gvhdl: $cmd\n";
+    if (execute_cmd ($cmd, "c++: ", $MSTREAM)/256 != 0) {
+      print MSTREAM "gvhdl: Compilation failed!\n";
+      print PROGRESS_BAR "99";
+      die;
+    }
+    
+    $progress_value = int($progress_value + $steps);
+    print PROGRESS_BAR $progress_value;
+  }
+
+  ##############################################################
+  # link
+  ##############################################################
+  if ($do_link == 1) {
+    $_ = $source_files[0];
+    s/\.[^\.]*//i;
+    my $target_name = $_;
+
+    my $cmd = "$libtool $libtool_options $cc $cpp_options $main_file_name.o $object_files $cpplibs -o $target_name";
+    print MSTREAM "gvhdl: Linking simulator '$target_name'...\n";
+    print MSTREAM "gvhdl: $cmd\n";
+    if (execute_cmd ($cmd, "linker: ", $MSTREAM)/256 != 0) {
+      print $MSTREAM "gvhdl: Linking failed!\n"; 
+      die;
+    }
+    print MSTREAM "gvhdl: ================================\n";
+    print MSTREAM "gvhdl: Simulator '$target_name' created.\n";
+    print MSTREAM "gvhdl: ================================\n";
+
+    print PROGRESS_BAR "99";
+  }
+}
+
+
+&main;

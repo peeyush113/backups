@@ -1,0 +1,993 @@
+2006-01-13  Stefan Jahn  <stefan@lkcc.org>
+
+	* printer.cc: Using stringstream instead of deprecated
+	strstream.
+
+2005-12-14  Stefan Jahn  <stefan@lkcc.org>
+
+	* Makefile.am (libfreehdl_vaul_la_SOURCES): Renamed
+	'freehdl_FlexLexer.h' to 'FlexLexer.h'.  The file also gets
+	installed with the freehdl headers now.  Thus the dependency
+	on a certain flex version is dropped for a final dist.  The
+	file must be updated whenever we decide to use another flex
+	for maintainership.  Right now using the flex 2.5.31 version.
+
+2005-12-04  Stefan Jahn  <stefan@lkcc.org>
+
+	* Makefile.am (lexer.cc): Use flex 2.5.31 version.  Thus the
+	output does not need to be patched...
+
+2004-12-01  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* stats.cc: code to support new class IIR_ImplicitProcessStatement
+	added.
+ 
+2004-11-18  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* printer.cc (vaul_printer): new format option "%;" added to error
+	printer (prints line number of node).
+ 
+2004-09-29  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* FlexLexer.h: renamed to freehdl_FlexLexer.h.
+
+	* lexer.cc: if header file "FlexLexer.h" is present, then this
+	file is included. Otherwise, "freehdl_FlexLexer.h" is included.
+
+2004-09-08  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* FlexLexer.h: New version.
+
+	* blocks.cc (vaul_parser::get_architecture): Avoid trigraph trap
+	by splitting string literal.
+
+	* vaprintf.cc: Only define _GNU_SOURCE when it isn't already.
+
+2004-04-28  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* expr.cc (vaul_parser::build_Expr_or_Attr): Correctly use the
+	base type when accessing record elements.
+
+2004-03-16  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* bison-parser.yy (simple_expression): Rewritten so that the sign
+	is correctly associated with the first term, not with the whole
+	simple_expression.  Also done in the skip grammar.
+	(simple_expression_no_sign): Removed.
+	(signed_term): New.
+
+2004-02-09  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* bison-parser.yy (architecture_body, skip_architecture_body):
+	Allow empty concurrent statement part.
+
+2004-02-03  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* attr.cc (vaul_parser::build_AttrNode): Signal error when the
+	prefix of 'range, 'reverse_range or 'length is not an array or
+	array type.
+
+	* bison-parser.yy (enumeration_type_definition): Use
+	build_EnumerationType instead of doing it inline.
+
+	* expr.cc (vaul_parser::build_Aggregate): Handle "others" choice
+	for record aggregates.  Use vaul_pos_eq to determine whether two
+	positions are equal.
+
+	* lexer.ll (vaul_pos_eq): New.
+
+	* stats.cc (vaul_parser::fix_for_scheme): Construct artificial
+	subtype for scalar non-subtypes (such as enumeration types).
+
+	* tree.cc (m_vaul_print_to_ostream): Print the universal integer
+	type and the universal real type as "<integer>" and "<real>",
+	respectively.
+
+	* types.cc (vaul_parser::build_EnumerationType,
+	vaul_parser::get_scalar_type_range): New functions.
+
+2004-01-29  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* bison-parser.yy: Synchronized skip_ generate statement syntax
+	with non-skip version.
+
+	* stats.cc (vaul_parser::build_ProcedureCallStat): Use
+	VAUL_VoidType as the target type for overload_resolution.
+
+	* expr.cc (vaul_parser::build_Expr_or_Attr): Do not try to decide
+	between subprograms and enumeration literals here, leave them all
+	in the set and make a AmbgEnumLitRef when there are no args, or a
+	AmbgCall when there are any.
+	(vaul_parser::build_SliceReference): Deal with rt == NULL.
+	(vaul_parser::disambiguate_expr1): Deal with an AmbgEnumLitRef
+	containing subprograms.
+	(m_vaul_compute_static_level): ExplicitRange: Deal with e->left or
+	e->right being zero.
+	(filter_return): Filter out procedures when the target type isn't
+	a supertype of VAUL_VoidType.
+
+	* subprogs.cc (vaul_parser::build_Interface,
+	vaul_parser::validate_interface, vaul_parser::validate_port,
+	vaul_parser::validare_generic): Deal with arguments being NULL.
+
+	* types.cc (vaul_parser::add_File): Deal with name_and_mode being
+	NULL.
+
+	* decls.cc (vaul_decl_set::add): When adding an 'indirect'
+	declaration, and there are already decls in the set, only add it
+	when it is overloadable.
+
+2003-12-12   Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* bison-parser.yy: subprograms can now no be also closed with "end
+	procedure ..." or "end function ...".
+
+2003-04-09  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* types.cc (vaul_parser::adapt_object_type): Do not print error
+	message for unknown cases.  The frontend handles type adaption
+	now.
+ 
+2003-04-09  Marius Vollmer  <mvo@zagadka.de>
+
+	* vaulgens-chunk.t (vaul_get_object_declaration): Added default
+	method for IIR_Expression.
+	* expr.cc (m_vaul_get_object_declaration): Return NULL in default
+	method.
+
+	* expr.cc: Make sure that sensible things happen when
+	vaul_get_object_declaration return NULL.
+	
+2003-04-09  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* printer.cc (vaul_printer::print_node, vaul_printer_vfprintf):
+	Add final '\0' so that string is properly terminated.
+
+2003-04-09  Marius Vollmer  <mvo@zagadka.de>
+
+	* FlexLexer.h, bison-parser.yy, lexer.ll, printer.cc, tree.cc,
+	vaulgens-chunk.h, vaulgens-chunk.t: Replaced deprecated headers
+	with modern ones.  Namespace games for GCC 3.
+
+2003-02-13  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* bison_parser.yy: missing ';' added.
+
+	* bison_parser.yy: macros YYINITDEPTH and YYMAXDEPTH added to
+	prevent parser stack overflows.
+
+2003-02-04  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* expr.cc (psr::associate_ports): problem with determining port
+	modes fixed.
+
+	* blocks.cc (psr::find_component_configuration): added "note:" to
+	info message about default bindings.
+	
+2002-07-16  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* expr.cc (associate_one): Expect the formal to be a
+	IIR_ObjectReference.  Do not check for multiple actuals for a
+	single formal.  Store the IIR_InterfaceDeclaration corresponding
+	to the IIR_ObjectReference in the new IIR_AssociationElement.
+	(associate): Construct a IIR_ObjectRefernce from the formal name.
+	Do no longer convert partial associations to artificial
+	aggregates.  Do not check for completeness of associations.
+	(get_interface_simple_name): Renamed to gtk_simple_name.
+	(build_formal_Expr): New.
+	(associate): Use it to build expression for the formal.  Call
+	'overload_resolution_not_for_read' an formal expression; mode
+	checks are done separately.
+
+	* blocks.cc (find_component_configuration): Superficially adapt to
+	new IIR_AssociationElement definition.  More to follow.
+
+2002-02-18  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* expr.cc (vaul_parser::build_Aggregate): Construct a
+	IIR_ArtificialRecordAggregate or IIR_ArtificialArrayAggregate when
+	given a Vaul_Artificial_Ambg_Aggregate, to preserve the
+	artificialnes.
+
+2002-02-14  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* printer.cc (vaul_printer::vfprintf): flag '%i' added.
+
+2002-01-08  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* printer.cc (vaul_printer::vfprintf): Do everything that used to
+	be done by virtual functions here.  Varargs are just not flexible
+	enough.
+	(vaul_printer::print_node): New.
+	(vaul_printer::format_out, vaul_printer::string_out): Removed.
+	* tree.cc (vaul_node_printer): Removed.
+	* message.cc (vaul_parser::print_node): New, takes place of
+	format_out.
+	(vaul_parser::format_out): Removed.
+
+2001-12-17  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* expr.cc (vaul_parser::check_for_update): Allow "open"
+	expressions to be updated.
+
+2001-12-16  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* expr.cc (vaul_parser::check_for_read,
+	vaul_parser::check_for_update): Check elements of aggregates.
+	(vaul_parser::associate_one): Always check for
+	readability/updateability, even for ports.
+	(vaul_parser::build_Aggregate): Use
+	overload_resolution_not_for_read instead of overload_resolution
+	for the elements.
+
+	* subprogs.cc (check_for_proper_type): New.
+	(vaul_parser::build_Interface): Use it to check for proper
+	constant, signal and file types.
+
+	* stats.cc (vaul_parser::check_target): Call check_for_update.
+	(vaul_parser::build_VarAssignment,
+	vaul_parser::build_SignalAssignment): Use
+	overload_resolution_not_for_read instead of overload_resolution
+	for the target.
+
+	* expr.cc (vaul_parser::build_Expr_or_Attr): Use
+	overload_resolution_not_for_read instead of overload_resolution
+	for the prefix of array or record references.
+	(mode_name, vaul_parser::check_for_read,
+	vaul_parser::check_for_update): New.
+	(associate_one): Use overload_resolution_not_for_read instead of
+	overload_resolution for the actual.  For non-ports, check actual
+	for readability or updateability depending on the mode of the
+	formal.
+	(associate_ports): New, like associate but checks port modes.
+	(overload_resolution): New "for_read" parameter.  Call
+	check_for_read when it is true.
+	
+	* decls.cc: Replace "buffer" with "bus" where appropriate.
+	(vaul_parser::add_Alias): Use overload_resolution_not_for_read
+	instead of overload_resolution for the aliased thing.
+
+	* blocks.cc (vaul_parser::build_BindingIndic): Use associate_ports
+	instead of just associate for additional checking.
+
+	* bison-parser.yy: Replaced "buffer" with "bus" in interface
+	declarations.  "buffer" is a signal mode, "bus" is the signal
+	kind.  This was a pretty long standing bug.
+	(block_stat): Use associate_ports instead of just associate for
+	additional checking.
+	
+	* attr.cc (vaul_parser::build_AttrNode): Do not check for
+	readability when resolving the prefix of a type attribute.
+
+2001-12-10  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* decls.cc (visit_scope): Only descend into the "used_unit" of a
+	use clause when it is a declarative region.
+	(vaul_parser::use): Do not cast used_unit when constructing a
+	IIR_UseClause.  Only check for presence when the used unit is a
+	declarative region.
+
+2001-12-07  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* types.cc. (psr::adapt_object_type): determining subytpe from
+	multi-dimensional array aggregates and aggregates with index
+	asociations is currently handled by the code generator
+	(commented out corresponding error messages).
+ 
+2001-11-02  Edwin Naroska  <edwin@ds.e-technik.uni-dortmund.de>
+
+	* vaulgens-chunk.t (psr::adapt_object_type): length of array
+	literal expressions were not determined correctly. However, array
+	index range is still not ok (see comment in source code).
+
+2001-11-01  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* types.cc (adapt_object_type): Handle VAUL_AmbgAggregates, but
+	only one-dimensional and only with positional association.
+
+2001-11-01  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* expr.cc (expr_type): Allow IR_OPEN_EXPRESSIONS with a type of
+	NULL.
+	(m_vaul_compute_static_level:IIR_ArrayAggregate,
+	m_vaul_compute_static_level:IIR_RecordAggregate): Be careful to not
+	dereference NULL pointers (that can result from previous errors in
+	the VHDL code).
+
+	* tree.cc, vaulgens-chunk.t (vaul_print_to_ostream): Cosmetic
+	updates.
+
+2001-10-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaulgens-chunk.t (vaul_print_to_ostream): Added methods for
+	IIR_AttrTypeValue and IIR_AttrTypeFunc.
+
+	* types.cc (vaul_parser::make_scalar_subtype, stringlitlen): New.
+	(vaul_parser::adapt_object_type): Use them for determing the range
+	of array literals for contants.
+
+	* tree.cc (attr_name, m_vaul_print_to_ostream:IIR_AttrTypeValue,
+	m_vaul_print_to_ostream:IIR_AttrFunc): New.
+
+	* decls.cc (vaul_parser::finish): Copy list of used units into
+	used_units slot.
+	(vaul_parser::use_unit): New, use it instead of "cur_du->uses"
+	everywhere.
+	
+	* blocks.cc (vaul_parser::get_architecture): Use use_unit instead
+	of "cur_du->uses".
+
+2001-10-04  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* stats.cc (get_implicit_signals): Handle array aggregates.
+
+2001-10-03  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* blocks.cc (vaul_parser::get_architecture): New.
+	(vaul_parser::start_BlockConfig): Use it to get at the real
+	architecture, not just a reference to it.
+
+	* bison-parser.yy (configuration_declaration): Do not drop
+	configs.
+
+2001-09-29  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy (physical_type_definition): Actually install
+	list of units in the type node.  Duh.
+
+2001-09-23  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* types.cc (vaul_compute_static_level:IIR_ScalarSubtype): New
+	method.
+
+	* expr.cc (get_partial_formal_type): Also copy static_level into
+	subarray_storage.
+	(vaul_merge_levels): New function.
+	(vaul_compute_static_level): Get static levels of types directly
+	from the IIR_Type node.  Moved IIR_Type methods to types.cc.
+	(vaul_compute_static_level:IIR_ArrayRange): New.
+	(vaul_compute_static_level:IIR_Allocator): New.
+
+	* vaulgens-chunk.t (vaul_compute_static_level): Updated method
+	list.
+	
+2001-09-17  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* types.cc: Adapted to renamings elsewhere.
+	(find_index_range_type): When both types can be universal integer,
+	return std.standard.integer without looking further, as per LRM.
+	
+	* bison-parser.yy (access_type_definition): Register type use when
+	the designated type is incomplete.
+
+	* attr.cc (build_AttrNode): Call `make_appropriate' on prefix to
+	handle access references correctly.
+
+2001-09-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy (subtype_indic_opt_incomplete): New.
+	(access_type_definition): Use it.
+
+	* expr.cc (m_vaul_compute_static_level:IIR_ConstantDeclaration):
+	Constants are only locally static when their initialization value
+	is.
+	(m_vaul_compute_static_level:IIR_AttrSigFunc): New.
+	
+	* vaulgens-chunk.t (vaul_compute_static_level): Added
+	IIR_AttrSigFunc node.
+
+2001-09-05  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* blocks.cc (vaul_parser::find_component_configuration): Only look
+	into WORK when allow_invisible_default_bindings_from_work is set
+	in options.
+
+	* decls.cc: Use new vaul_parser_options instead of parser flags.
+	(vaul_decl_set::has_filter): New.
+	(vaul_parser::find_decls): When there is a filter for
+	the decl_set, use a fresh (unfiltered) decl_set for looking up the
+	prefix.
+
+	* bison-parser.yy, dfile.cc, eval.cc, message.cc: Use new
+	vaul_parser_options instead of parser flags.
+
+2001-09-05  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* blocks.cc (vaul_parser::find_component_configuration):
+	Additionally look into the WORK library for compatability with
+	other simulators.  (Not yet working.)
+
+2001-08-15  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy: Rewritten expression grammar to conform to LRM.
+	Synchronized "skip" grammar.
+	
+2001-08-09  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* types.cc (add_File): Use "std.standard.ID" instead of "std.ID"
+	when converting '87 open modes.  Correct typo in error message.
+
+2001-08-08  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy (opt_file_name, opt_file_mode): Parse optional
+	'87 style open mode.
+
+	* types.cc (vaul_parser::add_File): Expect '87 open mode and
+	convert to '93 open kind expression when given.
+
+2001-03-13  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy (concurrent_stat_with_label): Set declarator of
+	concurrent statement to label and invalidate declaration cache.
+	These actions got lost in the last change.
+
+2001-03-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy: Added optional declarative part to generate
+	statements.  Rewrote concurrent statement grammar so that labels
+	are now syntactically required for block, component instantiation,
+	and generate statements.  This resolves conflicts with the
+	declarative part of generate statements.
+
+	* vaulgens-chunk.t (vaul_get_configuration_specifications,
+	vaul_set_configuration_specifications): Added method for
+	IIR_ConcurrentGenerateStatement.
+	* blocks.c: Added method definitions.
+	
+2001-02-05  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* blocks.cc (vaul_parser::find_component_configuration): Create
+	default generic and port maps when needed.
+
+2001-01-31  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* types.cc (vaul_parser::add_predefined_ops): Add FILE_OPEN and
+	FILE_CLOSE for file types.  Give names to formal parameters of the
+	predefined file procedures.
+
+	* decls.cc (vaul_parser::add_decl): Store away FILE_OPEN_KIND and
+	FILE_OPEN_STATUS when they are seen.
+
+2001-01-22  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* types.cc (vaul_parser::build_Subtype): Renamed from
+	build_ArraySubtype_or_ScalarSubtype.  Handle non-array and
+	non-scalar subtypes.
+
+	* bison-parser.yy: Call build_SubType instead of
+	build_ArraySubtype_or_ScalarSubtype.
+
+2001-01-23  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* bison-parser.yy: Call build_FileType instead of doing it
+	directly.  Create a IIR_RecordSubtype for subtypes of records.
+	
+	* types.cc (vaul_parser::build_FileType,
+	vaul_parser::legal_file_type): New, check for legal file types.
+	(vaul_parser::build_Subtype): Create an IIR_RecordSubtype for
+	records and complain about plain subtypes.
+	(vaul_parser::adapt_object_type): Do not try to
+	determine precisely constrained subtype for initialized constants.
+	The code generator does this, and it can do a much better job
+	anyway.
+
+	* decls.cc (vaul_decl_set::show), expr.cc, types.cc: Less verbose
+	reporting of candidates.  Changed wording of messages everywhere
+	to account for this change.
+
+	* expr.cc (vaul_parser::disambiguate_expr1): Do nothing with
+	IIR_Allocator nodes.
+
+2001-01-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* decls.cc, expr.cc: Replaced VAUL_PredefOp with
+	IIR_PredefinedFunctionDeclaration everywhere.
+
+	* types.cc: Replaced VAUL_PredefOp with
+	IIR_PredefinedFunctionDeclaration everywhere.  Also use
+	IIR_PredefinedProcedureDeclaration instead of
+	IIR_ProcedureDeclaration for builtin procedures like `deallocate'.
+	
+2001-01-12  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaulgens-chunk.t (vaul_get_configuration_specifications,
+	vaul_set_configuration_specifications): New generic functions.
+
+	* decls.cc: Implement new filter functionality of vaul_decl_set.
+	(find_decls): Do not use cache when DSET says so.
+	
+	* blocks.cc: Reimplemented configuration specification handling
+	once more.
+
+2001-01-06  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* decls.cc (pop_scope): Do not call bind_specs, it no longer
+	exists.
+
+	* blocks.cc: Completely reimplemented configuration
+	specifications.  Deactivated component configurations for the time
+	being.
+
+	* bison-parser.yy, stats.cc: Trivially adapted to changes
+	elsewhere.
+
+2000-12-21  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* expr.cc, mempool.cc, stats.cc tree.cc: Replaced "or" with "r"
+	throughout. "or" seems to be a keyword in C++.  Thanks to Philippe
+	Reynes!
+	
+	* vfatal.cc: Include <stdlib.h>.
+
+	* tree.cc (format_out): Do not use va_arg directly in `->'
+	expression.
+
+	* stats.cc (build_LoopControlStat): Do not use ?: operator when
+	assigning lcs.
+
+	* expr.cc (vaul_parser::prepare_named_assocs,
+	vaul_parser::grab_formal_conversion,
+	vaul_parser::try_association): Use IR_TYPE_DECLARATION instead of
+	IR_TYPE where appropriate.
+
+	* attr.cc, bison-parser.yy, blocks.cc, decls.cc, expr.cc,
+	printer.cc, stats.cc, subprogs.cc, tree.cc, types.cc,
+	vaulgens-chunk.h, vaulgens-chunk.t: Name space hygiene.
+	
+2000-11-19  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* attr.cc (build_AttrNode): Replaced "or" with "r"
+	throughout. "or" seems to be a keyword in C++.  Thanks to Philippe
+	Reynes!
+
+2000-10-11  Marius Vollmer  <marius.vollmer@uni-dortmund.de>
+
+	* types.cc (vaul_parser::build_IndexConstraint): Allow subtypes of
+	already constrained arrays.
+
+2000-09-22  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* tree.cc (vaul_default_printer): New.
+
+	* lexer.ll: Return a different set of terminal tokens for certain
+	keywords depending on whether `skipping' is true or not.
+
+	* expr.cc (vaul_parser::check_static_level): Correctly use "&"
+	instead of "&&" to test for the verboseness flag.  Oh boy!
+
+	* bison-parser.yy: Duplicated grammer and removed all actions in
+	second copy.  This is used to skip over unwanted design units at
+	high speed.
+
+2000-09-06  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* expr.cc (vaul_parser::build_SliceReference): Construct correct
+	subtype of slice reference.  Previously, it would point at the
+	sliced array type.
+
+2000-08-28  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* bison-parser.yy (subprog_body): Set prototype slot of body.
+
+2000-08-14  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* message.cc (vaul_parser::format_out): Use __va_copy to copy
+	va_list when it is available.
+
+2000-08-11  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* decls.cc (vaul_parser::add_Alias): Clone InterfaceDeclarations
+	as InterfaceDeclarations.
+
+	* types.cc (vaul_parser::build_ArraySubtype_or_ScalarSubtype): New
+	* bison-parser.yy (subtype_indic): Use it.
+
+	* expr.cc, vaulgens-chunk.t: Find more globally static things.
+	Still not complete, probably.
+
+	* expr.cc (vaul_parser::ambg_expr_types): Signal error about e
+	only when e is not NULL.
+
+2000-08-10  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* vaulgens-chunk.t, expr.cc: Compute static level of Attributes
+	and Types, but only whether they are locally static or not.
+
+	* Reorganized names of Attribute nodes.  Changed all references.
+
+2000-07-26  Marius Vollmer  <mvo@zagadka.ping.de>
+
+ 	* vaulgens-chunk.t (get_object_declaration): New generic.
+	* expr.cc (m_get_object_declaration): Methods for it.
+
+	* expr.cc (vaul_parser::build_Expr_or_Attr): Don't handle
+	IIR_AliasDeclarations, which do no longer exist.
+
+	* decls.cc: Include "vaulgens-chunk.h".
+	(vaul_parser::add_Alias): Do not construct a IIR_AliasDeclaration.
+	Instead, clone the aliased object.
+
+2000-07-13  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* bison-parser.yy (prog_or_func_spec): Allow a `subtype_indic'
+	instead of just a `mark' as the return type specifier.
+
+	* decls.cc (vaul_decl_set::single_decl): Maintain `external_decls'
+	slot of current library unit.
+
+2000-05-03  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* tree.cc (vaul_node_printer::print_node): Do not special-case
+	NULL pointer, operator<< does this already.
+
+	* attr.cc (build_AttrNode): Perform overload-resolution of
+	attribute argument here...
+	(find_array_attr_index_type): ...and not here.
+
+2000-04-28  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* fold.cc (evaluate_locally_static_universal_integer): Support
+	physical literals.
+
+	* attr.cc (find_array_attr_index_type): VHDL is 1-based, so do not
+	allow 0 as index.
+
+	* bison-parser.yy (secondary_unit_decl): Explicitely set
+	multiplier expression to be locally static.
+
+	* Makefile.am (libfreehdl_vaul_la_SOURCES): Added "fold.cc".
+	* fold.cc: New file.
+	* attr.cc (evaluate_locally_static_universal_integer): Moved to
+	"fold.cc".  Do not perform overload resolution.
+	(find_array_attr_index_type): Do it here.
+
+	* attr.cc (build_AttrNode): Create ArrayAttrs for all array
+	prefixes, including those that are not objects.  The ArrayAttrs
+	that don't have an object prefix have their array slot set to
+	NULL.  There is a new `array_type' slot that contains the type
+	denoted by the prefix.
+
+2000-03-31  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* lexer.ll: Allow underscores everywhere in identifiers and
+	complain later.
+
+	* decls.cc (init): Reset n_errors.
+
+	* bison-parser.yy: Allow empty block bodies.
+	(collect): Call tree_collect_garbage instead of
+	tree_maybe_collect_garbage.  Thresholding is now done by default.
+	
+2000-03-27  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* subprogs.cc (build_Interface, validate_interface,
+	validate_port): Check whether initial values are allowed when it
+	is known what kind of interface it is.
+
+2000-03-21  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* subprogs.cc (vaul_parser::build_Interface): Check whether a
+	default value is allowed and issue errors when not.
+
+	* expr.cc (prepare_named_assocs): Bug fix: check whether AN is not
+	NULL before testing whether it is a VAUL_SIMPLE_NAME.
+
+2000-02-07  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* vaul-chunk.t: Moved to freehdl/.
+	* vaulgens-chunk.t: Get vaul-chunk.t from freehdl/.  Pass suitable
+	"-I" option to gen-nodes.
+	* Makefile.am: Generate vaulgens-chunk.h here.
+	* expr.cc, blocks.cc, tree.cc: Get vaulgens-chunk.h from this
+	directory.
+	
+2000-01-06  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* pool.cc (package_body_name): Use "<package>(body)" to make for a
+	more sensible filename.
+
+1999-11-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+        * vaul-chunk.t (vaul_node_creator): Initialize seqno slot of
+	Declaration to -1.
+	* parser.h (next_decl_seqno): New state variable.
+	* decls.cc (add_decl): Use it to initialize the seqno of
+	Declarations.
+
+	* v2c.cc (emit_noqual_id): Emit seqno of Declarations.
+
+1999-10-18  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* Makefile.am (YPROTO, bison-parser.yy, bison-parser.cc,
+	bison-parser.h): Added explicit rules for the bison-parser file.
+	Grep out lines defined by YPROTO from the generated C++ file.
+	YPROTO matches the prototype definitions for yyparse which cause
+	harm with C++ because yyparse is actually a member function.
+
+1999-10-12  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy: Added "rol", "ror", "sla", "sll", "sra", "srl"
+	operators.
+	* lexer.ll: Added corresponding tokens.
+
+1999-09-30  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* expr.cc (check_static_level): Only warn when being verbose.
+	(expr_type): Likewise.
+	
+	* bison-parser.yy: Added "xnor" binary operator. 
+	* lexer.ll: Added "xnor" token. 
+
+1999-09-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaprintf.cc: Define _GNU_SOURCE, include <string.h> and check
+	for HAVE_VASPRINTF, not HAVE_ASPRINTF.
+
+	* lexer.ll: Do not use a typedef for struct el_mc.
+
+	* bison-parser.yy, parser.h (YYPARSE_PARAM, bison_parse): Added
+	hack so that bison.simple doesn't try to have a prototype for
+	vaul_parser::bison_parse.
+
+	* lexer.h, lexer.ll, message.cc, parser.h, v2c.cc, v2cc.cc: Added
+	 "const" qualifiers for correctness.
+	
+1999-08-11  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	First cut at determing static levels.
+	
+	* parser.h (check_static_level, disambiguate_expr1): New
+	prototypes.
+	* vaulgens-chunk.t (compute_static_level): New generic function.
+	* vaul-chunk.t (vaul_node_creator): Initialize static_level slot
+	of IIR_Expression to IR_NOT_STATIC.
+	* expr.cc: Include <libvaul/vaulgens-chunk.h>.
+	(disambiguate_expr): Set static_level of expression after
+	disambiguating.
+	(disambiguate_expr1): New.
+	(is_time_type, m_compute_static_level, check_static_level): New.
+	* bison-parser.yy: Be less verbose overall.
+	(constant_decl): Check whether initialization expression is
+	locally constant.  This is only a proof of concept.
+	* v2c.cc (emit): Output static expressions in brackets.
+
+	* stats.cc (push_GenerateStat): add loop variable of for scheme to
+	statement scope.
+
+1999-05-01  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-chunk.t, vaulgens-chunk.t, v2cc-chunk.t, v2c-chunk.t:
+	Renamed all ctypes so that they have valid C identifiers.  Changed
+	all uses. Removed duplicate definitions of ctypes.
+
+1999-04-26  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* vaul-chunk.t (vaul_node_creator): Use placement syntax to defer
+	to histogram keeping operator new.
+	* node-creator.h (vaul_node_creator_base::hist): New.
+	* bison-parser.yy (vaul_parser::parse): Print histogram of
+	allocated sizes.
+	
+1999-04-15  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy (subprog_decl, subprog_body): Call consumer when
+	we have one.  Collect garbage afterwards.
+	(vaul_parser::vaul_parser): Initialize fire, vaul and vaulgens
+	chunk.
+
+	* decls.cc (push_scope, pop_scope): Do not reverse list of
+	declarations.
+	(add_decl): Use add_Decl_plain to link declaration into list.
+	Call out to consumer under certain conditions.
+	(add_decl_plain): Add declaration at end of list, using the "tail"
+	extension of DeclarativeRegions.
+	(rem_decl): Maintain "tail" extension properly.
+
+	* dfile.cc (vaul_design_file::vaul_design_file): Link consumer
+	back to parser.
+
+	* parser.h (vaul_consumer): Changed names concurrent statement
+	consumer functions and added consume_pbody_decl virtual function.
+	Changed all users.
+
+	* v2c.cc (main): Do not init fire, vaul and vaulgens chunk.
+	(emit(vaul_pool*,char*)): Do not emit package bodies, they are
+	handled by the consumer now.
+	(push_conc_context, pop_conc_context): Only emit something when
+	there have been no errors in the parser yet.
+	(consume_pbody_decl): New.
+	(m_emit_decl(IIR_SubprogramDeclaration)): Toss subprogram body
+	statements when they are not needed anymore.
+	(m_emit_decl(IIR_Variable,Constant,SignalDeclaration)): Toss the
+	initialization value.
+
+	* v2cc.cc (main): Initialize v2cc chunk.  Don't initialize fire
+	and vaul chunk.  Initialize libname variable.
+
+	* vaul-chunk.t (IIR_DeclarativeRegion extension): Add tail slot.
+	
+1999-03-30  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* decls.cc (find_decls): Do not reset the decl_set when not
+	looking up the suffix of a selected name.  This undoes the change
+	from 1999-03-05.
+
+	* expr.cc (ensure_range_type): Do nothing when type is NULL for
+	the IR_ARRAY_RANGE case.
+
+	* stats.cc (build_SignalAssignment): Bug fix for the transport
+	delay case.  The created node was not assigned to S.
+
+	* v2c.cc (emit_delay): Do not emit "reject" expression when it is
+	NULL.
+	
+1999-03-14  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	Emit concurrent statements incrementally.
+	
+	* bison-parser.yy (entity_declaration): Push concurrent stats tail
+	after processing declarations so that the code generator sees the
+	declarations.  Pop concurrent stats tail before popping scope.
+	(architecture_body): Likewise.
+	(block_stat): Likewise.
+	(concurrent_stat): Reset starting_label beofre parsing concurrent
+	statement.
+	(concurrent_stat_1): Set starting_label when there is one.
+	(block_stat): Use starting_label as declarator.
+	(vaul_parser::vaul_parser): Initialize consumer.
+	(vaul_parser_gc_thresh): Default is now 10000, which is better
+	suited for incremental code generating.
+ 	
+	* design_file.h (vaul_design_file::read_design_unit): Add consumer
+	argument.
+	* dfile.cc (vaul_design_file::read_design_unit): Set consumer of
+	parser to passed in consumer argument.
+
+	* parser.h (vaul_consumer): New.
+	(vaul_parser::consumer, starting_label): New.
+	(vaul_parser::cstat_item::context): New.
+
+	* stats.cc (vaul_parser::push_concurrent_stats_tail): Set context
+	field of saved cstat_item.  Call out to consumer when we have one.
+	(vaul_parser::pop_concurrent_stats_tail): Call out to consumer
+	when we have one.
+	(vaul_parser::add_to_concurrent_stats_tail): Call out to consumer
+	when we have one.
+
+	* v2c-chunk.t (emit_start_of_context, emit_end_of_context): New.
+
+	* v2c.cc: Emit concurrent statements incrementally.
+	
+1999-03-13  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	Allow for incremental garbage collection between parsing of
+	concurrent statements.
+	
+	* decls.cc (vaul_parser::init): Initialize cstat_tail.  Protect
+	decl_cache location from garbage collector.
+	(vaul_parser::finish): Do not call invalidate_decl_cache, just set
+	decl_cache to NULL.  Unprotect decl_cache location.
+	(vaul_parser::invalidate_decl_cache): Do not deal with id being
+	NULL.
+
+	* parser.h (vaul_parser::invalidate_decl_cache): Remove default
+	value for id parameter.
+	(vaul_parser::cstat_item, cstat_tail. push_concurrent_stats_tail,
+	pop_concurrent_stats_tail, add_to_concurrent_stats_tail): New.
+	(vaul_parser::collect): New.
+
+	* stats.cc (vaul_parser::push_concurrent_stats_tail,
+	pop_concurrent_stats_tail, add_to_concurrent_stats_tail): New.
+
+	* v2c.cc (usage): Update usage message.
+	(main): Set vaul_parser_gc_thresh from -g option.
+
+	* bison-parser.yy: Do not construct list of concurrent statements
+	in free air.  Rather, use add_to_concurrent_stats_tail to grow it
+	in a way that the GC can see.
+	(entity_declaration, architecture_body, block_stat,
+	generate_stat): Use push_concurrent_stats_tail and
+	pop_concurrent_stats_tail to set up the growing point for
+	add_to_concurrent_stats_tail.
+	(block_stat): Associate generic and port map aspects as soon as
+	they are parsed.
+	(concurrent_stats): Do not return constructed list of conc
+	statements.  Do not use reverse_concurrent_stats.
+	(reverse_concurrent_stats): Removed.
+	(opt_concurrent_stats): New.
+	(concurrent_stat): Call add_to_concurrent_stats_tail for the
+	constructed statement, do not return it.  Call collect at the end.
+	(vaul_parser::collect, vaul_parser_gc_thresh): New.
+	
+1999-03-05  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* bison-parser.yy (concurrent_stat_1): Call invalidate_decl_cache
+	when setting a declarator explicitely.
+	(comp_inst_stat, comp_mark_with_keyword): Handle cases with
+	explicit "component", "entity" and "configuration" keyword.
+	(vaul_parser::vaul_parser): Initialize flags instead of verbose.
+	Call tree_protect instead of retain on no_sense_list.
+
+	* blocks.cc: (vaul_parser::build_CompInst): Fail gracefully when
+	bi is NULL. [both functions of this name]
+	(m_get_generics, m_get_ports): New implementation for
+	IIR_ArchitectureRef.
+
+	* parser.h (vaul_decl_set::copy_from): New prototype.
+	(VAUL_PARSER_VERBOSE, VAUL_PARSER_NOCACHE): New macros.
+	(vaul_parser::verbose, vaul_parser::flags): Replaced verbose by
+	more general flags.
+	(vaul_parser::decl_cache, invalidate_decl_cache,
+	find_in_decl_cache, add_to_decl_cache): New.
+
+	* decls.cc (vaul_parser::init): Initialize decl_cache.
+	(vaul_parser::finish): Invalidate decl cache.
+	(vaul_parser::add_decl): Invalidate newly added declarator in decl
+	cache.
+	(vaul_decl_set::copy_from): New.
+	(vaul_parser::decl_cache, invalidate_decl_cache,
+	find_in_decl_cache, add_to_decl_cache): New.
+	(vaul_parser::find_decls): Use and maintain cache for lookups of
+	VAUL_SimpleNames.  Reset decl_set immediatly after using it for the
+	prefix of VAUL_SelNames.
+
+	* design_file.h, dfile.cc (vaul_design_file::vaul_design_file):
+	Changed verbose parameter to more general parser_flags.
+
+	* dunit.cc (vaul_design_unit::~vaul_design_unit): Use
+	tree_unprotect instead of tree_base_node::release.
+	(vaul_design_unit::set_tree): Likewise.
+
+	* expr.cc (vaul_parser::build_Expr_or_Attr): Reorder name decoder
+	logic in a non-obvious but hopefully improved way.
+
+	* lexer.ll (vaul_lexer::LexerInput): Fail gracefully when file ==
+	NULL.  Set error status of lexer object when fgets fails.
+
+	* message.cc (vaul_parser::vinfo): Do not try to announce scope
+	when cur_Scope is NULL.
+
+	* v2c.cc: Add "-n" option to set the VAUL_PARSER_NOCACHE flag.
+	Update usage message.
+	(my_pool::get): Be silent about non-existent files, except when
+	being verbose.
+	(emit_binding): Handle IIR_ArchitectureRef.
+
+	* vaul-chunk.t (VAUL_ArchitectureRef): Removed.  It is replaced by
+	IIR_ArchitectureRef in fire-chunk.t.  Changed all users.
+	(VAUL_DeclCache): New.
+
+	* vaulgens-chunk.t (get_generics, get_ports): Added methods for
+	IIR_ArchitectureRef.
+	
+1999-02-25  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* v2c.cc (main): Call init_vaulgens_chunk and init_v2c_chunk.
+
+	* lexer.ll (strcasecmp, strncasecmp): Removed dubious portability
+	prototypes.
+
+	* common.h (bool, NULL): Removed dubious portability definitions
+	for bool and NULL.
+
+1999-02-24  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* v2c.cc (emit(vaul_pool,char*)): Report error stored in df, if
+	any.
+
+	Expressions in generic and port map aspects weren't receiving the
+	right overload resolution treatment.  Reported by Eric Gutt.
+	
+	* expr.cc (associate_one): Added parameter
+	need_overload_resolution.  Call overload_resolution instead of
+	just disambiguate_expr when it is true.
+	(associate): Added parameter need_overload_resolution.  it is
+	passed to associate_one.  Skip actuals that have a NULL expression
+	(due to previous errors, presumably).
+	(disambiguate_expr): Call associate with need_overload_resolution
+	set to false.
+
+	* parser.h (associate_one): Added need overload_resolution
+	parameter to prototype.
+	(associate): Added need overload_resolution parameter to prototype
+	and set default to true.

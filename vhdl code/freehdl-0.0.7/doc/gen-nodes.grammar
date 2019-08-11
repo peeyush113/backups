@@ -1,0 +1,58 @@
+OPT ::= (SYMBOL VALUE ...)
+
+(chunk NAME OPT ...)
+
+(deftype NAME OPT ...)
+
+(defnode NAME (BASE) (SLOT ...) OPT ...)
+
+SLOT ::= (TYPE NAME OPT ...)
+
+TYPE ::= SYMBOL [node-name or type-name or list-name]
+
+(defgeneric NAME OPT ...)
+
+(defmethods NAME (NODE ...) OPT ...)
+
+(defcreator NAME OPT ...)
+
+(defunion NAME OPT ...)
+
+- chunk options
+
+  (chunkno INTEGER)
+
+- type options
+
+  (c-type STRING)
+  (c-type-fmt STRING)
+
+- node options
+
+  (extra STRING ...)
+
+- slot options
+
+  (init VALUE)
+
+- generic options
+
+  (return TYPE-OR-NODE)
+  (args (TYPE-OR-NODE NAME) ...)
+  (methods NODE ...)
+
+- creator options
+
+  (base STRING)
+  (placement STRING)
+  (chunks NAME ...)
+  (inits (NODE (SLOT-NAME INIT) ...) ...)
+
+  INIT ::= SYMBOL
+         | STRING
+         | (wrap (TYPE PARM-NAME) STRING)
+
+- union options
+
+  (chunks NAME ...)
+

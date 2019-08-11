@@ -1,0 +1,62 @@
+2008-04-15  Stefan Jahn  <stefan@lkcc.org>
+
+	* configure.ac: Released version 0.0.6 and bumped up to version
+	0.0.7.
+
+2008-04-15  Stefan Jahn  <stefan@lkcc.org>
+
+	* configure.ac: Checking for gettimeofday().  Also checking for
+	libtool, but saving result in SYTEM_LIBTOOL instead of LIBTOOL
+	(build issue).
+
+2008-04-10  Stefan Jahn  <stefan@lkcc.org>
+
+	* configure.ac: Released version 0.0.5 and bumped up to version
+	0.0.6.
+
+2008-02-17  Stefan Jahn  <stefan@lkcc.org>
+
+	* configure.ac: Adding checks for pkg-config and libtool.
+
+2007-04-04  Stefan Jahn  <stefan@lkcc.org>
+
+	* configure.ac: Released version 0.0.4 and bumped up to version
+	0.0.5.
+
+2006-09-02  Stefan Jahn  <stefan@lkcc.org>
+
+	* configure.ac: Released version 0.0.3 and bumped up to version
+	0.0.4.
+
+2006-05-29  Stefan Jahn  <stefan@lkcc.org>
+
+	* configure.ac: Released version 0.0.2 and bumped up to version
+	0.0.3.
+
+2006-01-21  Stefan Jahn  <stefan@lkcc.org>
+
+	* configure.ac: Released version 0.0.1 and bumped up to version
+	0.0.2.
+
+2004-09-29  Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* configure.in: test to check for include file "FlexLexer.h"
+	added.
+	
+2003-07-26  Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* README.v2cc: file updated.
+	
+2001-10-01  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* Makefile.am (TESTS): New.
+
+2001-02-05  Edwin Naroska <edwin@ds.e-technik.uni-dortmund.de>
+
+	* configure.in (AC_HAVE_HEADERS): Check for system header 
+	file execinfo.h
+	
+2000-02-07  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* configure.in (AC_INIT): Use "freehdl/fire-chunk.t" as the
+	required source file.

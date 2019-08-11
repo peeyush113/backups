@@ -1,0 +1,1682 @@
+#! /bin/sh
+# restart with -*- scheme -*-
+exec guile -s $0 "$@"
+!#
+
+(debug-enable 'debug)
+(debug-enable 'backtrace)
+(read-enable 'positions)
+
+;;;  Copyright (C) 1998,1999,2000,2001  Marius Vollmer
+;;;
+;;;  VAUL is free software; you can redistribute it and/or modify it
+;;;  under the terms of the GNU Library General Public License as
+;;;  published by the Free Software Foundation; either version 2 of the
+;;;  License, or (at your option) any later version.
+;;;
+;;;  VAUL is distributed in the hope that it will be useful, but WITHOUT
+;;;  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+;;;  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General
+;;;  Public License for more details.
+;;;
+;;;  You should have received a copy of the GNU Library General Public
+;;;  License along with VAUL; see the file COPYING.LIB.  If not, write
+;;;  to the Free Software Foundation, Inc., 59 Temple Place, Suite 330,
+;;;  Boston, MA 02111-1307 USA.
+
+;; TODO
+;;
+;; - give correct position for (err ...)
+
+;; This is `gen-nodes', the Scheme program used to generate the C++
+;; rendition of the data types used in the intermediate
+;; representation.
+
+;;; Used modules.
+
+;; We include them here inline to make gen-nodes selfcontained.
+
+(define-module (struct)
+  :use-module (ice-9 common-list))
+
+(defmacro-public define-struct (tag . fields)
+  (let ((type-sym (gensym))
+	(field-syms (map (lambda (f)
+			   (if (pair? f) (car f) f))
+			 fields))
+	(make-parms (remove-if pair? fields))
+	(make-args (map (lambda (f)
+			  (if (pair? f) (cadr f) f))
+			fields)))
+    `(begin
+       (define ,type-sym (make-record-type ',tag ',field-syms))
+       (define ,(symbol-append 'make- tag)
+	 (let ((maker (record-constructor ,type-sym)))
+	   (lambda ,make-parms
+	     (maker ,@make-args))))
+       (define ,(symbol-append tag '?) (record-predicate ,type-sym))
+       ,@(map (lambda (f)
+		`(define ,(symbol-append tag '- f)
+		   (record-accessor ,type-sym ',f)))
+	      field-syms)
+       ,@(map (lambda (f)
+		`(define ,(symbol-append 'set- tag '- f '!)
+		   (record-modifier ,type-sym ',f)))
+	      field-syms))))
+
+(define-module (mini-format))
+
+(define-public (format-with-list-template dst fmt . args)
+  (cond
+   ((eq? dst #t)
+    (apply format-with-list-template (current-output-port) fmt args))
+   ((eq? dst #f)
+    (call-with-output-string
+     (lambda (p)
+       (apply format-with-list-template p fmt args))))
+   (else
+    (let loop ((fmt fmt)
+	       (args args))
+      (if (null? fmt)
+	  #t
+	  (let ((f (car fmt)))
+	    (cond
+	     ((string? f)
+	      (display f dst)
+	      (loop (cdr fmt) args))
+	     ((procedure? f)
+	      (loop (cdr fmt) (f args dst)))
+	     (else
+	      (error "unknown formatting op" f)))))))))
+
+(define (fmt-display args dst)
+  (display (car args) dst)
+  (cdr args))
+
+(define (fmt-write args dst)
+  (write (car args) dst)
+  (cdr args))
+
+(define (fmt-newline args dst)
+  (newline dst)
+  args)
+
+(define-public (string-template->list-template fmt)
+  (let ((tilde (string-index fmt #\~)))
+    (if (and tilde (< tilde (string-length fmt)))
+	(let* ((prefix (substring fmt 0 tilde))
+	       (arg (string-ref fmt (+ tilde 1))))
+	  (if (not (memq arg '(#\a #\d #\s #\%)))
+	      #f
+	      (let* ((rest (string-template->list-template
+			    (substring fmt (+ tilde 2))))
+		     (subst
+		      (case arg
+			((#\a #\d)
+			 fmt-display)
+			((#\s)
+			 fmt-write)
+			((#\%)
+			 (set! prefix (string-append prefix "\n"))
+			 #f))))
+		(and rest
+		     (if (zero? (string-length prefix))
+			 (cons subst rest)
+			 (cons prefix (if subst
+					  (cons subst rest)
+					  rest)))))))
+	;; no ~ in fmt
+	(if (zero? (string-length fmt))
+	    '()
+	    (list fmt)))))
+
+(defmacro-public mini-format-macro (dst fmt . args)
+  (let ((m-fmt (and (string? fmt) (string-template->list-template fmt))))
+    (if m-fmt
+	`(format-with-list-template ,dst ',m-fmt ,@args)
+	(error "unsupported format template" fmt))))
+
+(define-public (mini-format dst fmt . args)
+  (let ((m-fmt (and (string? fmt) (string-template->list-template fmt))))
+    (if m-fmt
+	(apply format-with-list-template dst m-fmt args)
+	(error "unsupported format template" fmt))))
+
+;;; Start of gen-nodes.
+
+(define-module (gen-nodes)
+  :use-module (mini-format)
+  :use-module (struct)
+  :use-module (ice-9 common-list)
+  :use-module (ice-9 regex))
+
+(if (not (defined? 'read-line))
+    (use-modules (ice-9 rdelim)))
+
+;;; Configuration
+
+(define default-include-path "@DEFAULT_INCLUDE_PATH@")
+
+;;; Some utility functions
+
+;; Like STRING-APPEND but also works on symbols.
+
+(define (string-append* . args)
+  (apply string-append
+	 (map (lambda (s)
+		(if (symbol? s)
+		    (symbol->string s)
+		    s))
+	      args)))
+
+;; Write ARGS to the current error port and return the last arg.
+
+(define (pk . args)
+  (write args (current-error-port))
+  (newline (current-error-port))
+  (car (last-pair args)))
+
+;; Return a string whose characters are the result of applying PROC to
+;; the characters of STR, from left to right.
+
+(define (string-map proc str)
+  (if (symbol? str)
+      (string-map proc (symbol->string str))
+      (let* ((len (string-length str))
+	     (str2 (make-string len)))
+	(do ((i 0 (1+ i)))
+	    ((= i len) str2)
+	  (string-set! str2 i (proc (string-ref str i)))))))
+  
+;; Return a new string that is the upper-case version of STR
+
+(define (upcase str)
+  (string-map char-upcase str))
+
+;; A weak imitation of CL push.  Insert X at the front of the list
+;; stored in PLACE.  When PLACE is a symbol, this macro expands to
+;;
+;;   (set! place (cons x place))
+;;
+;; When PLACE is a list whose first element is a symbol,
+;;
+;;   (push! x (field s))
+;;
+;; it essentially expands to
+;;
+;;   (set-field! s (cons x (field s)))
+;;
+;; but S is only evaluated once.  This works well with the structures
+;; defined by `define-struct'.
+
+(define-macro (push! x place)
+  (cond ((symbol? place)
+	 `(set! ,place (cons ,x ,place)))
+	((and (list? place) (symbol? (car place)))
+	 (let ((getter (car place))
+	       (setter (symbol-append 'set- (car place) '!))
+	       (stmp (gensym)))
+	   `(let ((,stmp ,(cadr place)))
+	      (,setter ,stmp (cons ,x (,getter ,stmp))))))
+	(else
+	 (error "bad push! syntax"))))
+
+;; Split STR into its syllables.  Syllable delimiters are "_", "-" and
+;; the transition from lower to upper case.  Thus, the strings
+;; "Holz_Hacker", "Holz-Hacker" and "HolzHacker" have all three the
+;; syllables ("Holz" "Hacker").
+
+(define (syllables str)
+  (if (symbol? str)
+      (syllables (symbol->string str))
+      (do ((syls '())
+	   (start 0)
+	   (pos 0 (1+ pos))
+	   (was-lower #f)
+	   (len (string-length str)))
+	  ((>= pos len) (reverse (cons (substring str start pos) syls)))
+	(let ((ch (string-ref str pos)))
+	  (cond ((memq ch '(#\- #\_))
+		 (push! (substring str start pos) syls)
+		 (set! start (1+ pos)))
+		((and was-lower (char-upper-case? ch))
+		 (push! (substring str start pos) syls)
+		 (set! start pos)))
+	  (set! was-lower (char-lower-case? ch))))))
+
+    
+;; Concatenate the strings in L (a list) with DEL between them
+
+(define (concat-strings l del)
+  (cond ((null? l)
+	 "")
+	((null? (cdr l))
+	 (car l))
+	(else
+	 (string-append* (car l) del (concat-strings (cdr l) del)))))
+
+;; Execute the BODY once for each element of the list L.  Within BODY,
+;; the variable V is bound to the current list element.
+
+(define-macro (do-list v l . body)
+  `(for-each (lambda (,v) ,@body) ,l))
+
+;; Print formatted output to the current error port.
+
+(define (info fmt . rest)
+  (apply mini-format (current-error-port) fmt rest))
+
+;; Like INFO, but also print the position of the current input port.
+;; Then throw a `processing-error'.  That is, the execution of
+;; gen-nodes is aborted.
+
+(define (err fmt . rest)
+  (let ((port (current-input-port)))
+    (info "~a:~a: " (port-filename port) (port-line port))
+    (apply info fmt rest)
+    (info "~%")
+    (throw 'processing-error)))
+
+;; Print formatted output to the current output port.  The current
+;; output port is usually the generated file when this function is
+;; called.
+
+(define (emit fmt . rest)
+  (apply mini-format (current-output-port) fmt rest))
+
+;;; Input
+
+;; The input files are evaluated as regular Scheme code.  Definition
+;; statements like `defnode', etc are really macros.  These macros
+;; just store away the interesting bits of their arguments and thus
+;; build an internal, `abstract' representation of the things defined
+;; in the input files.  When the input files have been sucessfully
+;; read, this internal representation is used to generate the
+;; requested output.
+
+;; The input files are evaluated in the "gen-nodes" module.  This sets
+;; them on an equal footing with the code in this file.  They see the
+;; same functions and can access the same variables.  That means that
+;; you can write arbitrarily complicated code in the input files
+;; themselves.  Currently, the support to cleanly extend gen-nodes is
+;; weak, tho.
+
+(define this-module (current-module))
+
+(define my-eval
+  (if (false-if-exception (eval #t))
+      eval
+      (lambda (form) (eval form this-module))))
+
+;; Evaluate the code in the file NAME.  Add the directory of NAME to
+;; the front of %load-path while doing so.  This allows the input file
+;; to specify included files relative to itself.
+
+(define (include name)
+  (let ((dir (or "." (dirname name)))   ; XXX - implement dirname
+	(oldpath %load-path)
+	(oldmodule (current-module)))
+    (dynamic-wind
+     (lambda () 
+       (push! dir %load-path)
+       (set-current-module this-module))
+     (lambda ()
+       (primitive-load-path name))
+     (lambda ()
+       (set! %load-path oldpath)
+       (set-current-module oldmodule)))))
+
+;; The rest of the provided statements are quite simple.  If the
+;; macros are too restrictive (because you want to compute the defined
+;; features with custom Scheme code, say), you can always use the
+;; corresponding `register-*' functions.
+
+(define-macro (chunk name . opts)
+  `(start-chunk ',name ',opts))
+
+;; XXX - the following two need to be rewritten to allow more precise
+;; placement of custom code.
+
+(define (header-add . lines)
+  (register-add-lines 'header lines))
+
+(define (impl-add . lines)
+  (register-add-lines 'impl lines))
+
+(define-macro (defctype name . opts)
+  `(register-ctype ',name ',opts))
+
+(define-macro (defnode name bases slots . opts)
+  `(register-node ',name ',bases ',slots ',opts))
+
+(define-macro (deflist name node . opts)
+  `(register-list ',name ',node ',opts))
+
+(define-macro (defextension node slots . opts)
+  `(register-extension ',node ',slots ',opts))
+
+(define-macro (defgeneric name . opts)
+  `(register-generic ',name ',opts))
+
+(define-macro (defmethods name methods . opts)
+  `(register-methods ',name ',methods ',opts))
+
+;; XXX - creators and unions are very VAUL specific and should
+;; probably be abstracted into a general mechanism for extending the
+;; code generation of gen-nodes from the input files.
+
+(define-macro (defcreator name . opts)
+  `(register-creator ',name ',opts))
+
+(define-macro (defunion name . opts)
+  `(register-union ',name ',opts))
+
+;;; Data structures for the internal representation
+
+;; A chunk holds them all together.
+
+(define-struct chunk
+  name
+  pointer-fmt-func
+  struct-fmt-func
+  kind-fmt-func
+  creator-fmt-func
+  opts
+  (nodes '())
+  (ctypes '())
+  (extensions '())
+  (generics '())
+  (num-generics 0)
+  (num-methods 0)
+  (methods '())
+  (base-nodes '())      ; the nodes that either don't have a base
+                        ; at all or whose base is in another chunk
+  (creators '())
+  (unions '()))
+
+(define (chunk-pointer-fmt ch . rest)
+  (apply (chunk-pointer-fmt-func ch) rest))
+
+(define (chunk-struct-fmt ch . rest)
+  (apply (chunk-struct-fmt-func ch) rest))
+
+(define (chunk-kind-fmt ch . rest)
+  (apply (chunk-kind-fmt-func ch) rest))
+
+(define (chunk-creator-fmt ch . rest)
+  (apply (chunk-creator-fmt-func ch) rest))
+
+;; A `type' is either a ctype that maps directly to a type defined in
+;; C++ (like "int"), or a node.
+
+(define-struct ctype
+  name
+  chunk
+  opts)
+
+(define-struct node
+  name
+  base
+  slots
+  chunk
+  opts
+  (derived '())        ; All nodes that have been derived from this one,
+                       ; and are in the same chunk as this one.
+  (referenced '()))    ; All nodes of the same chunk that have a slot
+		       ; pointing to this one
+
+;; Return a list of all slots of a node, both inherited ones and
+;; directly specified ones. The inherited slots precede the directly
+;; specified ones in the list.
+
+(define (node-effective-slots node)
+  (if node
+      (append (node-effective-slots (node-base node))
+	      (node-slots node))
+      '()))
+
+(define-struct slot
+  name
+  typesym      ; either the name of the type, or the type itself
+  opts)
+
+(define (find-slot name node)
+  (or (find-if (lambda (s) (eq? (slot-name s) name))
+	       (node-effective-slots node))
+      (err "node ~a has no ~a slot" (node-name node) name)))
+
+;; Return the real type for the slot S.  If the typesym of S is a
+;; symbol, replace it with the real type.  That is, slot types are
+;; searched for only when they are needed.  This allows one to refer
+;; to types that have not been defined.
+
+(define (slot-type s)
+  (let ((t (slot-typesym s)))
+    (cond ((symbol? t)
+	   (set! t (find-type t))
+	   (set-slot-typesym! s t)))
+    t))
+
+;; Is T the C++ "void" type?  A void type is one that is flagged with
+;; the option `(void #t)'.  The canonical void type is predefined
+;; below, after `register-ctype' has been defined.
+
+(define (type-void? t)
+  (and (ctype? t) (get-opt-val (ctype-opts t) 'void #f)))
+
+;; Return the C++ rendition of T as a string.
+
+(define (type->c t)
+  (cond ((ctype? t)
+	 (get-opt-val (ctype-opts t) 'cname (ctype-name t)))
+	((node? t)
+	 (node-pointer t))))
+
+;; Return the C++ rendition of a declaration that declares V (a
+;; symbol) to be of type T.
+
+(define (decl->c t v)
+  (string-append* (type->c t) " " v))
+
+(define-struct extension
+  node
+  slots
+  chunk
+  opts)
+
+(define-struct generic
+  name
+  ret-type
+  args        ; ((type . name) ...)
+  id          ; a unique id (within the chunk).  This is necessary
+              ; because there can be more than one generic with the
+              ; same name but with different args.
+  chunk
+  opts)
+
+(define-struct methods
+  generic
+  nodes       ; the nodes that we should generate specialized methods for
+  id
+  chunk
+  opts)
+
+;; Return the additional arguments of GEN in declaration form,
+;; suitable for a prototype.  The returned string is either empty or
+;; starts with a ",".  That makes it suitable to be tacked right on
+;; the mandatory first argument of a generic function.
+
+(define (generic-args-decl gen)
+  (apply string-append* (map (lambda (a)
+			      (string-append* ", " (decl->c (car a) (cdr a))))
+			    (generic-args gen))))
+
+;; Return the additional arguments of GEN in a form suitable for a
+;; function call.  This is, just the names, separated by commas.
+;; Like, the declaration form, the returned string is either empty or
+;; starts with a ","
+
+(define (generic-arg-names gen)
+  (apply string-append* (map (lambda (a)
+			      (string-append* ", " (cdr a)))
+			    (generic-args gen))))
+
+;; Is GEN a member function instead of an ordinary global function ?
+
+(define (generic-class-member? gen)
+  (pair? (generic-name gen)))
+
+;; Return the prefix of the qualified name of GEN.  For global
+;; functions this is the empty string, for a member function, it is
+;; the the string formed by concatenating the class names separated
+;; with "::" and appending a final "::".
+
+(define (generic-class-prefix gen)
+  (if (generic-class-member? gen)
+      (apply string-append* (map (lambda (c)
+				  (string-append* c "::"))
+				(butlast (generic-name gen) 1)))
+      ""))
+
+;; Return the complete C++ name of GEN as a string.
+
+(define (generic-func-name gen)
+  (let ((n (generic-name gen)))
+    (if (pair? n)
+	(concat-strings n "::")
+	n)))
+
+;; Return the name of a method of GEN.  For generic member functions,
+;; this does not include the class prefix.
+
+(define (generic-method-name gen meth)
+  (let ((n (generic-name gen))
+	(prefix (get-opt-val (methods-opts meth) 'prefix "m_")))
+    (string-append* prefix (if (pair? n)
+			      (car (last-pair n))
+			      n))))
+
+(define-struct creator name opts)
+(define-struct union name opts)
+
+(define all-chunks '())    ; the alist of all chunks seen so far
+(define all-types '())     ; the alist of all types in all chunks
+(define all-generics '())  ; the list of all generics in all chunks
+
+(define current-chunk #f)  ; the chunk that has been started most recently
+
+;; Return the chunk named NAME or issue an error.  Issuing an error
+;; aborts the program, so this function always returns a valid chunk,
+;; or does not return at all.
+
+(define (find-chunk name)
+  (let ((cell (assq name all-chunks)))
+    (if cell
+	(cdr cell)
+	(err "unknown chunk: ~a" name))))
+
+;; Try to find the type named NAME.  When it does not exist, return
+;; `#f'.
+
+(define (find-type? name)
+  (let ((cell (assq name all-types)))
+    (if cell (cdr cell) #f)))
+
+;; Find the type named NAME or issue an error.
+
+(define (get-dummy-type name)
+  (pk 'dummy name)
+  (register-node name '() '() '()))
+
+(define (find-type name)
+  (let ((t (find-type? name)))
+    (or t
+	; (get-dummy-type name)
+	(err "unknown type: ~a" name))))
+
+(define (build-node-xref)
+  (do-list nn all-types
+    (let ((n (cdr nn)))
+      (if (node? n)
+	  (do-list s (node-slots n)
+	    (let ((t (slot-type s)))
+	      (if (node? t)
+		  (push! n (node-referenced t)))))))))
+  
+;; Find the type named NAME and make sure that it is a node type.
+
+(define (find-node name)
+  (let ((t (find-type name)))
+    (if (not (node? t)) (err "not a node type: ~a" name))
+    t))
+
+;;; Find the generic named NAME that has args ARGS.  ARGS should be
+;;; the unprocessed list from the options.  That is, it should contain
+;;; the type names and not the types themself.
+
+(define (find-generic name args)
+  (define (match? g)
+    (and (eq? (generic-name g) name)
+	 (or (not args) 
+	     (equal? (get-opt (generic-opts g) 'args '()) args))))
+  (or (find-if match? all-generics)
+      (err "unknown generic ~a ~a" name args)))
+
+;;; Building the internal representation
+
+(define (start-chunk name opts)
+
+  (define (get-fmt-func fmt-key func-key def)
+    (let ((func (get-opt-val opts func-key #f)))
+      (if func
+	  (my-eval func)
+	  (let ((fmt (get-opt-val opts fmt-key def)))
+	    (lambda (sym) (@@ fmt sym))))))
+  
+  (let ((c (make-chunk 
+	    name
+	    (get-fmt-func 'pointer-fmt 'pointer-fmt-func "n~a")
+	    (get-fmt-func 'struct-fmt 'struct-fmt-func "s~a")
+	    (get-fmt-func 'kind-fmt 'kind-fmt-func "nk~a")
+	    (get-fmt-func 'creator-fmt 'creator-fmt-func "m~a")
+	    opts)))
+    (set! all-chunks (acons name c all-chunks))
+    (set! current-chunk c)
+    c))
+
+(define (register-node name bases slots opts)
+  (let* ((base-node (if (null? bases) #f (find-node (car bases))))
+	 (slots (map 
+		 (lambda (s)
+		   (make-slot (cadr s) (car s) (cddr s)))
+		 slots))
+	 (node (make-node name base-node slots current-chunk opts)))
+    (if (find-type? name)
+	(err "type ~a already defined" name))
+
+    ; When this node has a base node, and it is in the same chunk, add
+    ; this node to the `derived' list of the base node.  Else, add it
+    ; to the list of `base-nodes' of the current chunk.
+
+    (if (and base-node (eq? (node-chunk base-node) current-chunk))
+	(push! node (node-derived base-node))
+	(push! node (chunk-base-nodes current-chunk)))
+
+    (push! node (chunk-nodes current-chunk))
+    (push! (cons name node) all-types)
+    node))
+
+(define (force-slot-types ch)
+  (do-list n (chunk-nodes ch)
+    (do-list s (node-slots n)
+      (slot-type s))))
+
+(define (register-ctype name opts)
+  (let ((t (make-ctype name current-chunk opts)))
+    (if current-chunk (push! t (chunk-ctypes current-chunk)))
+    (push! (cons name t) all-types)
+    t))
+
+;; We predefine the "void" type, because we need it as the default for
+;; the return type of generic functions.  No other types are
+;; predefined, not even "int".
+
+(defctype void
+  (void #t))
+
+(define void-type (find-type 'void))
+
+(define (register-extension node-name slots opts)
+  (let* ((node (find-node node-name))
+	 (slots (map (lambda (s)
+		       (make-slot (cadr s) (car s) (cddr s)))
+		     slots))
+	 (ext (make-extension node slots current-chunk opts)))
+    (push! ext (chunk-extensions current-chunk))
+    ext))
+
+(define (register-generic name opts)
+  (let* ((return (find-type (get-opt-val opts 'return 'void)))
+	 (args (map (lambda (a)
+		      (cons (find-type (car a)) (cadr a)))
+		    (get-opt opts 'args '())))
+	 (gen (make-generic
+	       name return args (chunk-num-generics current-chunk)
+	       current-chunk opts)))
+    (push! gen (chunk-generics current-chunk))
+    (push! gen all-generics)
+    (set-chunk-num-generics! current-chunk
+			     (1+ (chunk-num-generics current-chunk)))
+    (let ((methods (get-opt opts 'methods #f)))
+      (if methods
+	  (register-methods name methods opts)))
+    gen))
+
+(define (register-methods name methods opts)
+  (let* ((gen (find-generic name (get-opt opts 'args #f)))
+	 (nodes (map find-node methods))
+	 (m (make-methods gen nodes (chunk-num-methods current-chunk)
+			  current-chunk opts)))
+    (push! m (chunk-methods current-chunk))
+    (set-chunk-num-methods! current-chunk
+			    (1+ (chunk-num-methods current-chunk)))
+    m))
+
+(define (register-creator name opts)
+  (let ((c (make-creator name opts)))
+    (push! c (chunk-creators current-chunk))
+    c))
+
+(define (register-union name opts)
+  (let ((u (make-union name opts)))
+    (push! u (chunk-unions current-chunk))
+    u))
+
+(define add-lines '())
+
+(define (register-add-lines cmd lines)
+  (if (and (eq? arg-cmd cmd)
+	   (eq? (chunk-name current-chunk) arg-chunk))
+      (set! add-lines (append add-lines lines))))
+  
+;;; Generating C++ code
+
+;; Some shortcuts for often needed things.
+
+;; Pass ARGS to emit and output a newline.
+
+(define (@ . args)
+  (apply emit args)
+  (emit "~%"))
+
+;; Return the result of formatting REST according to FMT as a string.
+
+(define (@@ fmt . rest)
+  (apply mini-format #f fmt rest))
+
+;; The enum literal that denotes the kind of N
+
+(define (node-kind n) 
+  (chunk-kind-fmt (node-chunk n) (node-name n)))
+
+;; The struct name for the representation of N
+
+(define (node-struct n)
+  (chunk-struct-fmt (node-chunk n) (node-name n)))
+
+;; A pointer to the struct for N
+
+(define (node-pointer n)
+  (chunk-pointer-fmt (node-chunk n) (node-name n)))
+
+;; The name of a function for creating a instance of N
+
+(define (node-creator n)
+  (chunk-creator-fmt (node-chunk n) (node-name n)))
+
+;; Apply PROC to each node of the chunk CH in a certain order.  The
+;; order is so that all nodes derived from a certain node N come
+;; directly after that node, without intervening nodes that are not
+;; derived from N.
+
+(define (visit-chunk-nodes proc ch)
+  (define (visit n)
+    (proc n)
+    (for-each visit (node-derived n)))
+  (for-each visit (chunk-base-nodes ch)))
+
+(define (emit-lines lines)
+  (cond ((not (null? lines))
+	 (@ "")
+	 (do-list l lines
+	   (@ "~a" l)))))
+
+;; Return all values of the option KEY in the list OPTS.  When there
+;; is no KEY option, return DEF.  The values of an option is the cdr
+;; of the sublist that starts with KEY.  For example
+;;
+;;   (get-opt '((foo 1 2) (bar 3 4)) 'bar #f)
+;;   =>
+;;   (3 4)
+;;
+;;   (get-opt '((foo 1 2) (bar 3 4)) 'blubb #f)
+;;   =>
+;;   #f
+
+(define (get-opt opts key def)
+  (let ((cell (assq key opts)))
+    (if cell (cdr cell) def)))
+
+;; Get only the first value of option KEY.  Return DEF when there is
+;; no KEY option.  For example
+;;
+;;   (get-opt-val '((foo 1) (bar 2)) 'bar #f)
+;;   =>
+;;   2
+
+(define (get-opt-val opts key def)
+  (let ((tail (get-opt opts key (list def))))
+    (car tail)))
+
+;; Creator support.
+
+;; Distinguish between the `traditional' and `modern' forms of
+;; NODE-INIT (sans node type) specifications.  The modern form can
+;; have options, while the traditional one can't.
+;;
+;; Modern:      (((SLOT INIT) ...) OPTION...) and (() OPTION...)
+;; Traditional: ((SLOT INIT) ...)             and ()
+
+(define (modern-node-init? node-init)
+  (and (not (null? node-init)) 
+       (or (null? (car node-init))
+	   (pair? (caar node-init)))))
+
+;; Canonicalize a NODE-INIT.  The traditional forms gets rewritten
+;; into the modern one, with no options.
+
+(define (canonicalize-node-init node-init)
+  (if (modern-node-init? node-init)
+      node-init
+      (cons node-init '())))
+
+;; Accessors for the canonical form
+
+(define (node-init-slots node-init)
+  (car node-init))
+
+(define (node-init-options node-init)
+  (cdr node-init))
+
+;; Merge two slot-init/options in canonical form.  Merging is done by
+;; appending the base information to the node information so that the
+;; latter overrides the former.
+
+(define (merge-node-inits base derived)
+  (cons (append (node-init-slots derived)
+		(node-init-slots base))
+	(append (node-init-options derived)
+		(node-init-options base))))
+
+;; Collect all slot-inits and options pertaining to NODE.  The result
+;; is a list of merged node-inits in canonical form for NODE and its
+;; bases.  All combinations are formed.
+
+(define (find-inits node inits)
+  (if node
+      (let ((n-inits (map (lambda (i) (canonicalize-node-init (cdr i)))
+			  (remove-if 
+			   (lambda (i)
+			     (not (eq? (car i) (node-name node))))
+			   inits)))
+	    (b-inits (find-inits (node-base node) inits)))
+	(if (null? n-inits)
+	    b-inits
+	    (apply append 
+		   (map (lambda (ni)
+			  (map (lambda (bi) (merge-node-inits bi ni)) b-inits))
+			n-inits))))
+      '((()))))
+
+;; From the `inits' option of the creator, INITS, find the init value
+;; for the SLOT of NODE.  When there is no init value specified,
+;; return `#f'.  SLOT does not need to be a direct slot of NODE.  When
+;; it is inherited from some base of NODE, the init values for that
+;; base are consulted.
+
+;; Inits can be:
+;;
+;; #f:   no init, use the slot as parameter
+;;
+;; symbol/string: 
+;;       constant init, no parameter
+;;
+;; (wrap ((TYPE NAME) ...) STRING):
+;;       computed init, use TYPE and NAME for the parameter and 
+;;       the string as the constructor argument.
+
+(define (find-slot-init slot node-init)
+  (and=> (assq (slot-name slot) (node-init-slots node-init)) cadr))
+
+;; Return the declaration of the parameter for INIT, if it needs one.
+;; Return `#f' when INIT does not need one.  SLOT is the slot for this
+;; initializer.
+
+(define (init-decl init slot)
+  (cond ((eq? #f init)
+	 (decl->c (slot-type slot) (slot-name slot)))
+	((or (string? init) (symbol? init))
+	 #f)
+	((list? init)
+	 (case (car init)
+	   ((wrap)
+	    (let ((parms (cadr init)))
+	      (concat-strings (map (lambda (p)
+				     (decl->c (find-type (car p)) (cadr p)))
+				   parms)
+			      ", ")))
+	   (else
+	    (err "unknown1 init ~a" init))))
+	(else
+	 (err "unknown2 init ~a" init))))
+
+;; Return the constructor argument for INIT/SLOT.
+
+(define (init-arg init slot)
+  (cond ((eq? #f init)
+	 (slot-name slot))
+	((or (string? init) (symbol? init))
+	 init)
+	((list? init)
+	 (case (car init)
+	   ((wrap)
+	    (caddr init))
+	   (else
+	    (err "unknown3 init ~a" init))))
+	(else
+	 (err "unknown4 init ~a" init))))
+
+;; Return a string containing a ","-separated list of all
+;; init-parameter declarations of N.
+
+(define (creator-decls n inits)
+  (concat-strings (remove-if not
+			     (map (lambda (s)
+				    (init-decl (find-slot-init s inits) s))
+				  (node-effective-slots n)))
+		  ", "))
+
+(define (creator-args n inits)
+  (concat-strings (map (lambda (s)
+			 (init-arg (find-slot-init s inits) s))
+		       (node-effective-slots n))
+		  ", "))
+
+(define (creator-construct-extras node-init)
+  (reverse
+   (pick-mappings (lambda (opt)
+		    (and (eq? 'construct-extra (car opt))
+			 (cadr opt)))
+		  (node-init-options node-init))))
+
+(define (emit-list-header node info)
+  (define (i->t i) (type->c (slot-type (find-slot i node))))
+  (let ((first-t (i->t (car info)))
+	(rest-t (i->t (cadr info))))
+    (@ "  ~a get_successor_element (~a element)" first-t first-t)
+    (@ "  { return ~a(IR_GenericList::get_successor_element (element)); }"
+       first-t)))
+
+(define (emit-list-impl node info)
+  (define (i->t i) (type->c (slot-type (find-slot i node))))
+  (let ((first-t (i->t (car info)))
+	(rest-t (i->t (cadr info))))
+    (@ "")
+    (@ "~a" first-t)
+    (@ "~a::get_successor_element (~a element)" (node-struct node) first-t)
+    (@ "{")
+    (@ "  ~a l = this;" (node-pointer node))
+    (@ "  while (l && l->~a != element)" (car info))
+    (@ "    l = l->~a;" (cadr info))
+    (@ "  return l? l->~a : 0;" (car info))
+    (@ "}")))
+
+(define (slot-init s)
+  (let ((ifilt (get-opt-val (slot-opts s) 'init-filter #f)))
+    (or ifilt (slot-name s))))
+
+;; Emit the C++ header for chunk CH.
+
+(define (emit-header ch)
+  (@ "// generated by gen-nodes from `~a'.  Do not edit." arg-in-file)
+  (@ "")
+  (@ "#ifndef ~a_H" (upcase (chunk-name ch)))
+  (@ "#define ~a_H" (upcase (chunk-name ch)))
+
+  (force-slot-types ch)
+
+  (emit-lines add-lines)
+
+  ;; Emit a forward declaration of the struct name for every node, a
+  ;; typedef for the pointer type and the real node kind, that is
+  ;; unique among all nodes in all chunks.  The forward reference is
+  ;; needed so that we can freely refer to all node structs when later
+  ;; defining them for real.
+
+  ;; Additionally, emit the prototype for a reversion function, if
+  ;; this node type is used as a list.  The reversion feature will
+  ;; probably go away when we implement a more sophisticated list
+  ;; mechanism for AIRE.
+
+  (@ "")
+  (@ "extern tree_chunk_info ~a_chunk_info;" (chunk-name ch));
+  (do-list ctype (reverse (chunk-ctypes ch))
+    (@ "extern tree_ctype_info ~a_ctype_info;" (ctype-name ctype)))
+  (do-list node (reverse (chunk-nodes ch))
+    (@ "struct ~a;" (node-struct node))
+    (@ "typedef ~a *~a;" (node-struct node) (node-pointer node))
+    (@ "extern tree_kind_info ~a_kind_info;" (node-kind node))
+    (@ "#define ~a (&~a_kind_info)" (node-kind node) (node-kind node))
+    (if (get-opt-val (node-opts node) 'reverse #f)
+	(@ "~a reverse (~a);" (node-pointer node) (node-pointer node))))
+
+  ;; Emit the actual node struct definitions.
+
+  (do-list node (reverse (chunk-nodes ch))
+    (@ "")
+    (@ "struct ~a : ~a {" 
+       (node-struct node)
+       (if (node-base node) 
+	   (node-struct (node-base node))
+	   (get-opt-val (chunk-opts ch) 'default-base 'tree_base_node)))
+    (do-list s (node-slots node)
+      (@ "  ~a;" (decl->c (slot-type s) (slot-name s))))
+    (@ "")
+    (@ "  ~a (~a) " 
+       (node-struct node)
+       (concat-strings (map (lambda (s)
+			      (decl->c (slot-type s) (slot-name s)))
+			    (node-effective-slots node))
+		       ", "))
+
+    ;; The list of all inits is first put into a list and then emitted
+    ;; as a whole to get the C++ syntax strangeness right.
+    (let ((inits '())
+	  (b (node-base node)))
+      (if b
+	  (set! inits (list (@@ "~a (~a)"
+				(node-struct b)
+				(concat-strings
+				 (map slot-name (node-effective-slots b))
+				 ", ")))))
+      (do-list s (node-slots node)
+	(set! inits (cons (@@ "~a (~a)" (slot-name s) (slot-init s))
+			  inits)))
+      (cond ((not (null? inits))
+	     (@ "  : ~a" (concat-strings (reverse inits) ",\n    "))))
+      (@ "    { }"))
+
+    (@ "")
+    (@ "  tree_kind kind ();")
+    (do-list e (get-opt (node-opts node) 'extra '())
+      (@ "  ~a" e))
+    (let ((list-info (get-opt (node-opts node) 'list #f)))
+      (if list-info (emit-list-header node list-info)))
+    (@ "};"))
+
+  ;; Emit the prototypes for the generic functions and their methods,
+  ;; but only for generics that are not member functions.  The user is
+  ;; supposed to supply its own prototypes with the class definition.
+
+  (do-list gen (reverse (chunk-generics ch))
+    (@ "")
+    (@ "typedef ~a (~a*~a_generic_~a_mtype) (tree_base_node*~a);"
+       (type->c (generic-ret-type gen))
+       (generic-class-prefix gen)
+       (chunk-name ch)
+       (generic-id gen)
+       (generic-args-decl gen))
+    (@ "extern tree_generic<~a_generic_~a_mtype> ~a_generic_~a;"
+       (chunk-name ch) (generic-id gen) (chunk-name ch) (generic-id gen))
+    (cond ((not (generic-class-member? gen))
+	   (let ((args-decl (generic-args-decl gen))
+		 (cret (type->c (generic-ret-type gen))))
+	     (@ "~a ~a (tree_base_node *~a);"
+		cret
+		(generic-func-name gen)
+		args-decl)))))
+
+  (do-list meth (reverse (chunk-methods ch))
+    (let* ((gen (methods-generic meth))
+	   (args-decl (generic-args-decl gen))
+	   (cret (type->c (generic-ret-type gen)))
+	   (name (generic-method-name gen meth)))
+      (do-list node (reverse (methods-nodes meth))
+	(@ "~a ~a (~a ~a);" cret name (node-pointer node) args-decl))))
+
+  ;; Emit the necessary structs and inline accessors for node
+  ;; extensions.
+
+  ;; XXX - Maybe it is a good idea to also emit such accessors for the
+  ;; regular node slots.
+
+  (do-list ext (reverse (chunk-extensions ch))
+    (@ "")
+    (@ "struct ~a_~a_ext : tree_prop {"
+       (chunk-name ch) (node-struct (extension-node ext)))
+    (@ "  ~a_~a_ext ();" (chunk-name ch) (node-struct (extension-node ext)))
+    (@ "  tree_prop_info *get_info ();")
+    (do-list s (reverse (extension-slots ext))
+      (@ "  ~a;" (decl->c (slot-type s) (slot-name s))))
+    (@ "};")
+    (@ "")
+    (@ "struct ~a_~a_ext *get_~a_ext (~a n);"
+       (chunk-name ch) (node-struct (extension-node ext))
+       (chunk-name ch) (node-pointer (extension-node ext)))
+    (do-list s (reverse (extension-slots ext))
+      (@ "static inline ~a& ~a (~a n) { return get_~a_ext (n)->~a; }"
+	 (type->c (slot-type s))
+	 (slot-name s)
+	 (node-pointer (extension-node ext))
+	 (chunk-name ch)
+	 (slot-name s))))
+
+  ;; Emit definitions for all creator structs.
+
+  (do-list c (reverse (chunk-creators ch))
+    (@ "")
+    (let ((base (get-opt-val (creator-opts c) 'base #f))
+	  (chunks (get-opt (creator-opts c) 'chunks '()))
+	  (inits (get-opt (creator-opts c) 'inits '())))
+      (@ "struct ~a~a {" 
+	 (creator-name c) (if base (@@ " : ~a" base) ""))
+      (do-list c chunks
+	(do-list n (chunk-nodes (find-chunk c))
+	  (do-list i (find-inits n inits)
+	    (@ "  ~a ~a (~a);" 
+	       (node-pointer n) (node-creator n)
+	       (creator-decls n i)))))
+      (@ "};")))
+
+  ;; And finally the unions.
+
+  (do-list u (reverse (chunk-unions ch))
+    (@ "")
+    (@ "union ~a {" (union-name u))
+    (do-list c (get-opt (union-opts u) 'chunks '())
+      (do-list n (chunk-nodes (find-chunk c))
+	(@ "  ~a ~a;" (node-pointer n) (node-name n))))
+    (@ "};"))
+
+  (@ "")
+  (@ "void init_~a_chunk ();" (chunk-name ch))
+  
+  (@ "")
+  (@ "#endif"))
+
+
+;; Return the node that is directly or indirectly derived from NODE
+;; and comes last in the sequence of nodes produced by
+;; visit-chunk-nodes.  All nodes derived from NODE have kind ids that
+;; lie between the kind id of NODE and the kind id of the node
+;; returned by this function.
+
+(define (last-derived node)
+  (if (null? (node-derived node))
+      node
+      (last-derived (car (last-pair (node-derived node))))))
+
+;; Follow the chain of base nodes of NODE and return the first node
+;; that does not belong the same chunk as NODE.  Return `#f' when
+;; there is no such node.
+
+(define (chunk-base node)
+  (let ((base (node-base node)))
+    (cond ((not base)
+	   #f)
+	  ((not (eq? (node-chunk base) (node-chunk node)))
+	   base)
+	  (else
+	   (chunk-base base)))))
+
+;; Follow the chain of base nodes of NODE and return the first node
+;; that is a member of the list NODES.  Return `#f' when there is no
+;; such node.
+
+(define (find-member-base node nodes)
+  (if (member node nodes)
+      node
+      (let ((base (node-base node)))
+	(if base
+	    (find-member-base base nodes)
+	    #f))))
+
+;; Emit the C++ implementation of the various things in the chunk CH.
+
+(define (emit-impl ch)
+
+  (define (visit-chunk-nodes-counted proc chunk)
+    (let ((i 0))
+      (visit-chunk-nodes
+       (lambda (node)
+	 (let ((res (proc node i)))
+	   (set! i (1+ i))
+	   res))
+       chunk)))
+
+  (define used-chunks '())
+
+  (define (use-chunk uch)
+    (if (and uch (not (eq? uch ch)) (not (memq uch used-chunks)))
+	(set! used-chunks (cons uch used-chunks))))
+
+  (@ "// generated by gen-nodes from `~a'.  Do not edit." arg-in-file)
+
+  (force-slot-types ch)
+
+  (emit-lines add-lines)
+
+  ;; Emit info structs for the defined C types.
+
+  (do-list t (chunk-ctypes ch)
+    (@ "tree_ctype_info ~a_ctype_info = {" (ctype-name t))
+    (@ "  -1,")
+    (@ "  \"~a\"," (ctype-name t))
+    (@ "  ~a," (get-opt-val (ctype-opts t) 'printer "NULL"))
+    (@ "};"))
+
+  ;; Emit the run-time type info for all node kinds.
+
+  (visit-chunk-nodes-counted
+   (lambda (node i)
+     (use-chunk (and=> (chunk-base node) node-chunk))
+     (let ((slots (node-slots node))
+	   (n-links 0)
+	   (n-slots 0))
+       (@ "")
+       (@ "static tree_slot_info ~a_slot_info[] = {" (node-name node))
+       (do-list s slots
+	 (let ((t (slot-type s)))
+	   (cond
+	    ((node? t)
+	     (@ "  { ~a, \"~a\", (tree_base_node*tree_base_node::*)&~a::~a }," 
+		(node-kind t) (slot-name s) (node-struct node) (slot-name s))
+	     (set! n-links (1+ n-links))))))
+       (set! n-slots n-links)
+       (do-list s slots
+	 (let ((t (slot-type s)))
+	   (cond
+	    ((ctype? t)
+	     (@ "  { (tree_kind_info*)&~a_ctype_info, \"~a\", (tree_base_node*tree_base_node::*)&~a::~a }," 
+		(ctype-name t) (slot-name s) (node-struct node) (slot-name s))
+	     (set! n-slots (1+ n-slots))))))
+	 
+       (@ "};")
+       (@ "")
+       (@ "tree_kind_info ~a_kind_info = {" (node-kind node))
+       (@ "  ~a," i)    ; kind_id
+       (@ "  \"~a\"," (node-name node))
+       (@ "  &~a_chunk_info," (chunk-name ch))
+       (@ "  ~a," (let ((b (node-base node)))
+		    (if b (node-kind b) "0")))
+       (@ "  ~a," (node-kind (last-derived node)))
+       (@ "  ~a," (let ((b (chunk-base node)))
+		    (if b (node-kind b) "0")))
+       (@ "  ~a, ~a, ~a_slot_info," n-links n-slots (node-name node))
+       (@ "  sizeof(~a)" (node-struct node))
+       (@ "};")))
+   ch)
+
+  ;; Emit the implementation of the node structs.  Currently, this is
+  ;; only the virtual function for returning the node kind.  The
+  ;; reversion function is also emitted here, if one has been
+  ;; requested.
+
+  (do-list node (reverse (chunk-nodes ch))
+    (@ "")
+    (@ "tree_kind ~a::kind () { return ~a; }"
+       (node-struct node) (node-kind node))
+    (let ((revslot (get-opt-val (node-opts node) 'reverse #f)))
+      (if revslot
+	  (let ((p (node-pointer node)))
+	    (@ "")
+	    (@ "~a reverse (~a n)" p p)
+	    (@ "{")
+	    (@ "  ~a r = NULL;" p)
+	    (@ "  while (n)")
+	    (@ "    {")
+	    (@ "      ~a n2 = n->~a;" p revslot)
+	    (@ "      n->~a = r;" revslot)
+	    (@ "      r = n;")
+	    (@ "      n = n2;")
+	    (@ "    }")
+	    (@ "  return r;")
+	    (@ "}"))))
+    (let ((list-info (get-opt (node-opts node) 'list #f)))
+      (if list-info (emit-list-impl node list-info))))
+
+  ;; Now for the interesting part, the dispatching mechanism of the
+  ;; generic functions.  We climb the inheritance hierarchy
+  ;; chunk-by-chunk until we have found a chunk that we have a method
+  ;; table for.  Then we index this method table with the constant
+  ;; kind_id of the last node obtained while climbing.  When there
+  ;; indeed is a function at this location, we call it.
+
+  ;; The code is a little bit complicated by the fact that we want to
+  ;; deal with both non-member function pointers and member function
+  ;; pointers in a mostly uniform way, but you can't cast a
+  ;; member-pointer into `void*' and back.
+
+  ;; As of now, the code is in a template class, so you wont find much
+  ;; interesting code here.  It's in "tree-supp.cc".
+
+  (do-list gen (reverse (chunk-generics ch))
+    (@ "")
+    (@ "tree_generic<~a_generic_~a_mtype> ~a_generic_~a;"
+       (chunk-name ch) (generic-id gen) (chunk-name ch) (generic-id gen))
+    (@ "")
+    (@ "~a ~a (tree_base_node *__node__~a)"
+       (type->c (generic-ret-type gen))
+       (generic-func-name gen)
+       (generic-args-decl gen))
+    (@ "{")
+    (@ "  ~a_generic_~a_mtype __method__ = "
+       (chunk-name ch) (generic-id gen))
+    (@ "    ~a_generic_~a.find (__node__->kind ());"
+       (chunk-name ch) (generic-id gen))
+    (@ "  ~a(~a*__method__) (__node__~a);"
+       (if (type-void? (generic-ret-type gen)) "" "return ")
+       (if (generic-class-member? gen) "this->" "")
+       (generic-arg-names gen))
+    (@ "}"))
+
+  ;; Emit method tabs for every set of methods defined.
+
+  (do-list meth (reverse (chunk-methods ch))
+    ;; Find the list of chunks that have methods.
+    (let* ((gen (methods-generic meth))
+	   (gen-ch (chunk-name (generic-chunk gen)))
+	   (chunks (uniq (map node-chunk (methods-nodes meth)))))
+
+      (use-chunk (generic-chunk gen))
+      (for-each use-chunk chunks)
+
+      ;; Then emit a table for each of these chunks
+      (do-list chunk chunks
+	(@ "")
+	(@ "static ~a_generic_~a_mtype mtab_~a_~a[] = {"
+	   gen-ch (generic-id gen) (methods-id meth) (chunk-name chunk))
+
+	;; For each node, find the method that applies to it.
+	(visit-chunk-nodes
+	 (lambda (node)
+	   (let ((base (find-member-base node (methods-nodes meth))))
+	     (if base
+		 ;; The & operator is necessary here. gcc bug?
+		 (@ "  (~a_generic_~a_mtype) ((~a (~a*)(~a~a))&~a),  // ~a"
+		    gen-ch (generic-id gen)
+		    (type->c (generic-ret-type gen))
+		    (generic-class-prefix gen)
+		    (node-pointer base)
+		    (generic-args-decl gen)
+		    (generic-method-name gen meth)
+		    (node-name node))
+		 (@ "  0, // ~a"
+		    (node-name node)))))
+	 chunk)
+	(@ "};"))
+
+      ;; Collect all method tables into a `partial generic'.  These
+      ;; partial generics will be merged at run-time.
+      (@ "static tree_chunk_tab ctab_~a[~a] = {" 
+	 (methods-id meth) (length chunks))
+      (do-list chunk chunks
+	(@ "  { &~a_chunk_info, ~a, mtab_~a_~a },"
+	   (chunk-name chunk) (length (chunk-nodes chunk))
+	   (methods-id meth) (chunk-name chunk)))
+      (@ "};")
+      (@ "")
+      ;; (@ "static tree_generic<~a_generic_~a_mtype> pgen_~a (~a, ctab_~a);"
+      ;;    gen-ch (generic-id gen) (methods-id meth) 
+      ;;    (length chunks) (methods-id meth)
+      ))
+
+  ;; Emit the functions that return the extension struct for the
+  ;; inline accessors emitted in the header.  Also emit the
+  ;; constructor for the extension struct.
+
+  (do-list ext (reverse (chunk-extensions ch))
+    (let* ((n (extension-node ext))
+	   (n-struct (node-struct n))
+	   (c-name (chunk-name ch)))
+      (use-chunk (chunk-base n))
+      (@ "")
+      (@ "~a_~a_ext::~a_~a_ext ()" c-name n-struct c-name n-struct)
+      (@ "{")
+      (do-list slot (extension-slots ext)
+        (let ((init (get-opt-val (slot-opts slot) '= #f)))
+	  (if init
+	      (@ "  ~a = ~a;" (slot-name slot) init))))
+      (@ "}")
+      (@ "")
+      (let ((n-links 0)
+	    (n-slots 0))
+	(@ "static tree_propslot_info ~a_~a_propslot_info[] = {"
+	   c-name n-struct)
+	(do-list s (extension-slots ext)
+          (let ((t (slot-type s)))
+	    (cond
+	     ((node? t)
+	      (@ "  { ~a, \"~a\",(tree_base_node*tree_prop::*)&~a_~a_ext::~a },"
+		 (node-kind t) (slot-name s) c-name n-struct (slot-name s))
+	      (set! n-links (1+ n-links))))))
+	(set! n-slots n-links)
+	(do-list s (extension-slots ext)
+          (let ((t (slot-type s)))
+	    (cond
+	     ((ctype? t)
+	      (@ "  { (tree_kind_info*)&~a_ctype_info, \"~a\",(tree_base_node*tree_prop::*)&~a_~a_ext::~a },"
+		 (ctype-name t) (slot-name s) c-name n-struct (slot-name s))
+	      (set! n-slots (1+ n-slots))))))
+	(@ "};")
+	(@ "")
+	(@ "static struct tree_prop_info ~a_~a_prop_info = {" c-name n-struct)
+	(@ "  ~a, ~a," n-links n-slots)
+	(@ "  ~a_~a_propslot_info" c-name n-struct)
+	(@ "};")
+	(@ "")
+	(@ "tree_prop_info *")
+	(@ "~a_~a_ext::get_info ()" c-name n-struct)
+	(@ "{")
+	(@ "  return &~a_~a_prop_info;" c-name n-struct)
+	(@ "}")
+	(@ "")
+	(@ "static int ~a_~a_key;" c-name n-struct)
+	(@ "")
+	(@ "~a_~a_ext *get_~a_ext (~a n)"
+	   c-name n-struct c-name (node-pointer n))
+	(@ "{")
+	(@ "  ~a_~a_ext *attrs = (~a_~a_ext *) n->get (~a_~a_key);"
+	   c-name n-struct c-name n-struct c-name n-struct)
+	(@ "  if (attrs == 0)")
+	(@ "    {")
+	(@ "       attrs = new ~a_~a_ext;" c-name n-struct)
+	(@ "       n->put (~a_~a_key, attrs);" c-name n-struct)
+	(@ "    }")
+	(@ "  return attrs;")
+	(@ "}"))))
+
+  ;; Emit the creation functions.  This is straightforward with the
+  ;; support functions defined above.
+
+  (do-list c (chunk-creators ch)
+    (@ "")
+    (let ((base (get-opt-val (creator-opts c) 'base #f))
+	  (chunks (map find-chunk (get-opt (creator-opts c) 'chunks '())))
+	  (inits (get-opt (creator-opts c) 'inits '()))
+	  (placement (get-opt-val (creator-opts c) 'placement #f)))
+      (do-list ch chunks
+	(use-chunk ch)
+	(do-list n (chunk-nodes ch)
+	  (do-list i (find-inits n inits)
+	    (@ "")
+	    (@ "~a ~a::~a (~a)"
+	       (node-pointer n) (creator-name c) (node-creator n)
+	       (creator-decls n i))
+	    (@ "{")
+	    (@ "  ~a n = new~a ~a (~a);"
+	       (node-pointer n)
+	       (if placement (@@ " (~a)" placement) "")
+	       (node-struct n)
+	       (creator-args n i))
+	    (do-list e (creator-construct-extras i)
+	      (@ "  ~a (n);" e))
+	    (@ "  return n;")
+	    (@ "}"))))))
+
+  ;; Emit the init function.
+
+  (@ "")
+  (@ "static tree_kind ~a_kinds[~a] = {"
+     (chunk-name ch) (if (>= 0 (length (chunk-nodes ch))) ""
+			 (length (chunk-nodes ch))))
+  (do-list n (reverse (chunk-nodes ch))
+    (@ "  ~a," (node-kind n)))
+  (@ "};")
+  (@ "")
+  (@ "struct tree_chunk_info ~a_chunk_info = {" (chunk-name ch))
+  (@ "  -1,")      ; chunk_id, will be filled in by tree_register_chunk
+  (@ "  \"~a\"," (chunk-name ch))
+  (@ "  ~a," (length (chunk-nodes ch)))
+  (@ "  ~a_kinds" (chunk-name ch))
+  (@ "};")
+  (@ "")
+  (@ "void init_~a_chunk ()" (chunk-name ch))
+  (@ "{")
+  (@ "  if (~a_chunk_info.chunk_id != -1)" (chunk-name ch))
+  (@ "    return;")
+  (pk 'used-chunks (map chunk-name used-chunks))
+  (do-list used-ch used-chunks
+    (@ "  init_~a_chunk ();" (chunk-name used-ch)))
+  (@ "")
+  (@ "  tree_register_chunk (&~a_chunk_info);" (chunk-name ch))
+  (do-list gen (reverse (chunk-generics ch))
+    (@ "  ~a_generic_~a.init (\"~a\");"
+       (chunk-name ch) (generic-id gen) (generic-name gen)))
+  (do-list meth (reverse (chunk-methods ch))
+    (let ((gen (methods-generic meth))
+	  (n-chunks (length (uniq (map node-chunk (methods-nodes meth))))))
+      (@ "  ~a_generic_~a.merge (~a, ctab_~a);"
+	 (chunk-name (generic-chunk gen)) (generic-id gen)
+	 n-chunks (methods-id meth))))
+  (do-list ext (reverse (chunk-extensions ch))
+    (@ "  ~a_~a_key = tree_uniq_prop_key (~a);"
+       (chunk-name ch) (node-struct (extension-node ext))
+       (node-kind (extension-node ext))))
+  (@ "}")
+
+  ;; Emit some C++ magic to have the init function be called
+  ;; automatically.  XXX - this doesn't seem to work with all shared
+  ;; library implementations.
+
+  (@ "")
+  (@ "struct ~a_auto_initializer {" (chunk-name ch))
+  (@ "  ~a_auto_initializer () { init_~a_chunk (); }"
+     (chunk-name ch) (chunk-name ch))
+  (@ "} ~a_ignition;" (chunk-name ch)))
+
+(define (emit-noext ch)
+  (@ "// generated by gen-nodes from `~a'.  Do not edit." arg-in-file)
+
+  (@ "#ifndef ~a_NOEXT_H" (upcase (chunk-name ch)))
+  (@ "#define ~a_NOEXT_H" (upcase (chunk-name ch)))
+
+  (@ "")
+  (@ "typedef IIRBase IIR;")
+  (@ "typedef pIIRBase pIIR;")
+  (do-list n (reverse (chunk-nodes ch))
+    (@ "typedef ~a IIR_~a;" (node-struct n) (node-name n))
+    (@ "typedef ~a pIIR_~a;" (node-pointer n) (node-name n)))
+
+  (@ "")
+  (@ "#endif"))
+
+(define (emit-node-list ch)
+  (do-list n (reverse (chunk-nodes ch))
+    (let ((syls (cdr (syllables (node-name n)))))
+      (@ "s/m~a/m~a/g" (node-name n) (node-name n)))))
+
+(define (emit-type-hierarchy ch)
+
+  (define (emit-node-list p nl)
+    (if (not (null? nl))
+	(let ((n (car nl))
+	      (nl (cdr nl)))
+	  (@ "~a|" p)
+	  (@ "~a~a~a" p (if (null? nl) "\\-" "+-") (node-name n))
+	  (let ((p (string-append* p (if (null? nl) "  " "| "))))
+	    (emit-node-list p (node-derived n)))
+	  (emit-node-list p nl))))
+
+  (@ "tree_base_node")
+  (emit-node-list "" (chunk-base-nodes ch)))
+
+(define (emit-node-doc n)
+  (define (slot->c slot)
+    (@@ "@t{~a}" (decl->c (slot-type slot) (slot-name slot))))
+  (define (table-row label items)
+    (if (null? items)
+	(@ "@item ~a @tab none" label)
+	(begin
+	  (@ "@item ~a @tab ~a" label (car items))
+	  (do-list i (cdr items)
+	    (@ "@item @tab ~a" i)))))
+
+  (@ "@deftp Node ~a" (node-name n))
+  (@ "@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}")
+  (@ "@item Inherits from: @tab ~a" (if (node-base n)
+				       (node-name (node-base n))
+				       "tree_base_node"))
+  (table-row "Inherited by:" (map node-name (node-derived n)))
+  (table-row "Referenced by:" (map node-name (node-referenced n)))
+  (table-row "Inherited slots:" (map slot->c 
+				     (node-effective-slots (node-base n))))
+  (table-row "Direct slots:" (map slot->c (node-slots n)))
+  (@ "@end multitable")
+  (@ ""))
+
+(define (emit-all-node-docs ch)
+  (define (sort l c) l)
+  (define (node-compare n1 n2) (string<? (node-name n1) (node-name n2)))
+  (do-list n (sort (chunk-nodes ch) node-compare)
+    (emit-node-doc n)
+    (@ "@end deftp")
+    (@ "")))
+
+(define (emit-doc)
+  (build-node-xref)
+  (let loop ((line (read-line)))
+    (cond 
+     ((not (eof-object? line))
+      (cond
+       ((string-match "^@typehierarchy ([^ ]*)" line)
+	=> (lambda (m)
+	     (let ((chunk-name (string->symbol (match:substring m 1))))
+	       (emit-type-hierarchy (find-chunk chunk-name)))))
+       ((string-match "^@defnode ([^ ]*)" line)
+	=> (lambda (m)
+	     (let ((name (string->symbol (match:substring m 1))))
+	       (emit-node-doc (find-node name)))))
+       ((string-match "^@end defnode" line)
+	(@ "@end deftp"))
+       ((string-match "^@allnodedocs ([^ ]*)" line)
+	=> (lambda (m)
+	     (let ((chunk-name (string->symbol (match:substring m 1))))
+	       (emit-all-node-docs (find-chunk chunk-name)))))
+       (else
+	(@ "~a" line)))
+      (loop (read-line))))))
+
+;;; Main
+
+(define (error-cleanup)
+  (delete-file arg-out-file))
+
+(define argv (command-line))
+
+(define (peek-argv)
+  (and (not (null? argv)) (car argv)))
+
+(define (pop-argv)
+  (let ((arg (peek-argv)))
+    (if arg 
+	(set! argv (cdr argv))
+	(error "too few arguments"))
+    arg))
+
+(define prog-name (pop-argv))
+
+(define extra-search-dirs '())
+
+(set! %load-path (cons default-include-path %load-path))
+
+(let loop ()
+  (cond ((and (peek-argv) (string=? (peek-argv) "-I"))
+	 (pop-argv)
+	 (set! extra-search-dirs (append! extra-search-dirs (list (pop-argv))))
+	 (loop))))
+
+(set! %load-path (append! extra-search-dirs %load-path))
+
+(cond ((< (length argv) 4)
+       (info "usage: ~a OPTIONS CMD CHUNK IN-FILE OUT-FILE~%" prog-name)
+       (info "where CMD is `header' or `impl'.~%")
+       (info "OPTIONS can be:~%")
+       (info "  -I <dir>      add <dir> to the search path~%")
+       (quit 1)))
+
+(define arg-cmd      (string->symbol (list-ref argv 0)))
+(define arg-chunk    (string->symbol (list-ref argv 1)))
+(define arg-in-file  (list-ref argv 2))
+(define arg-out-file (list-ref argv 3))
+
+(catch #t
+       (lambda ()
+	 (with-output-to-file arg-out-file
+	   (lambda ()
+	     (include arg-in-file)
+	     (let ((ch (find-chunk arg-chunk)))
+	       (case arg-cmd
+		 ((header)
+		  (emit-header ch))
+		 ((impl)
+		  (emit-impl ch))
+		 ((type-hierarchy)
+		  (emit-type-hierarchy ch))
+		 ((noext)
+		  (emit-noext ch))
+		 ((doc)
+		  (emit-doc)))))))
+       (lambda args
+	 (error-cleanup)
+	 (apply throw args)))

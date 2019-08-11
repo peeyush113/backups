@@ -1,0 +1,434 @@
+[ If you are working on FIRE, please update this document accordingly.
+  The `I' in the text is mvo@zagadka.ping.de (Marius Vollmer). ]
+
+
+Differences between FIRE and AIRE
+*********************************
+
+The node type definition in fire-chunk.t are an attempt to get as
+close to AIRE as reasonable, but there are both large and small
+differences that are mostly motivated by my laziness.  But many are
+also due to my unhappines with certain AIRE features.
+
+Being fully AIRE compliant is a worthy goal.  But right now, I think
+it does not pay off to put much energy into this as there are more
+useful goals.
+
+Below is a (incomplete) account of the differences between FIRE and
+AIRE, with biased comments.
+
+
+Framework
+---------
+
+With the term `framework', I'm referring to the general constructs
+with which FIRE and AIRE try to support their general goals.  This
+includes things like the operations that are supported for every node
+type, memory management, the precise way how new types are defined,
+extensibility, modularity and more.
+
+The framework of FIRE is more advanced than the one of AIRE and I see
+no point in going with AIRE in this regard.  There has been much
+discussion about this topic on the FreeHDL list, and improvements for
+the framework were the original motivation to start with FIRE.  The
+advantages of FIRE include:
+
+  - Painless high level definitions
+  - Definitions are trivially and confidently machine-readable
+  - Run-time type information via the "is-a" predicate.
+  - Flexible run-time extensibility
+  - Extensibility includes new node types, new visitor functions and
+    new node attributes without recompiling.
+  - Semi-automatic memory management with a simple garbage collector
+  - Inspection facilities that can be used to implement persistence
+
+Please see the libfire sources for ultimate technical details.
+
+
+General Node Stuff
+------------------
+
+The nodes of a abstract syntax `tree' form a graph.  It is useful to
+find a definition what a node can be.  It pays to find a simple but
+general definition because it makes graph algorithms easier to specify
+and implement.  For example, memory management and persitent stores
+are much easier to implement when the nodes have been kept
+conceptually simple.
+
+FIRE views the syntax graph as a passive, mostly un-mutable data
+structure.  It consists of nodes that contain typed pointers to other
+nodes, and additional payload.  This simplistic definition is mapped
+to a similarily simplistic C++ implementation.  Each node type is
+mapped to a C++ struct with the pointers and the payload implemented
+as public data members.
+
+In addition to the type id, there is also a predicate that can test
+whether a given node is derived from a given type.
+
+AIRE uses C++ syntax to describe the node type definitions.  It does
+not seem to have restrictions on what features of C++ one might use in
+such a node type definition.  The AIRE spec randomly uses both public
+data members and accessor functions.
+
+It is possible to add the accessor functions to FIRE to achieve AIRE
+source compatability.  But the underlying simple view of a node as a
+passive data structure should remain.  In fact, using *only* accessor
+functions would be an improvement for FIRE, but they should not
+destroy the fundamental `passiveness' of the graphs, and there should
+not be a random mixture between data members and accessor functions.
+
+AIRE often uses the effectively untyped IIR node type.  This makes the
+specification less precise and less transparent.  FIRE tries to avoid
+the use of IIR and prefers more specialized types instead.  For
+example, a IIR_SignalAssignmentStatement in AIRE denotes the target by
+an IIR, while FIRE uses IIR_Expression.
+
+FIRE generally tries to put the burden on the frontend.  It chooses a
+representation that is convenient for the clients of the frontend.
+For example, it requires that all names have been resolved.
+
+
+Basic Data Types
+----------------
+
+FIRE mostly uses the types defined in AIRE.
+
+IR_Kind: this is not an enumeration member, but a pointer to an opaque
+information structure.  This should be of no consequence, but IR_Kind
+is no longer an integral type that can be used to index arrays, say.
+
+IR_Direction: new type to denote the direction of ranges.
+
+IR_String: new type to hold a constant string and do memory management
+for it.
+
+
+IIR Base Class
+--------------
+
+The get_kind and get_kind_text functions of AIRE are named kind and
+kind_name in FIRE, for no good reasons.
+
+No source location methods are implemented.  Instead, a IIR node
+points to a IIR_PosInfo node.  Predefined IIR_PosInfo types include
+IIR_PosInfo_TextFile and IIR_PosInfo_Sheet.  It is possible to
+trivially implement new kinds of position information.
+
+IIR_Statement is not implemented.
+
+
+IIR_DesignFile & IIR_Comment Derived Classes
+--------------------------------------------
+
+Unimplemented.  Comments are ignored completely and DesignFiles are
+not mapped into the graph.  The largest unit for a graph is a design
+unit.  Design files are handled by the frontend.
+
+
+IIR_Literal Derived Classes
+---------------------------
+
+IIR_TextLiteral has an IR_String attribute called `text' that holds
+the characters of the literal.  IIR_Identifier, IIR_CharacterLiteral,
+and IIR_StringLiteral are derived from TextLiteral without adding any
+new features.  There is no `get' method.
+
+There is no IIR_BitStringLiteral because the lexer converts bit string
+literals immediately into IIR_StringLiterals.  It would be better to
+retain bit string literals unchanged to produce better error messages.
+
+IIR_IntegerLiteral just uses a IR_String for the value, without any
+support routines.  When we want to have arbitrary integers, we should
+be using a bignum package (like GNU mp) and remove
+IIR_IntegerLiteral32, IIR_IntegerLiteral64 completely.  The same
+applies to IIR_FloatingPointLiteral and derived types.
+
+There are additional types IIR_AbstractLiteral,
+IIR_AbstractIntegerLiteral, and IIR_AbstractFloatingPointLiteral to
+further structure the hierachy.
+
+
+IIR_Tuple Derived Classes
+-------------------------
+
+IIR_AssociationElement: Moved actual from AEByExpression to here.
+Added formal_conversion and actual_conversion.  When actual is
+IIR_OpenExpression, then it's an AEOpen, else it's an AEByExpression.
+The types AEByExpression and AEOpen are there and correctly used, too.
+
+IIR_BreakElement: unused/unimplemented.
+
+IIR_CaseStatementAlternative: Moved ChoiceList from CSAByChoices to
+base class.  CSAByExpression, CSAByChoices, CSAByOthers are not used.
+It's all in the ChoiceList.  This could be done AIRE style.
+
+IIR_Choice: added CByExpression, CByRange, CByOthers.  Choice is an
+abstract class.  This could be done AIRE style.
+
+IIR_ConditionalWaveform: unused/unimplemented.  A conditional signal
+assignemnt is expanded into its equivalent process.
+
+IIR_ConfigurationItem: derived from IIR_DeclarativeRegion for historic
+reasons.  Needs to be cleaned up.
+
+IIR_ComponentConfiguration: has no `name' element.
+
+IIR_Designator*: unused/unimplemented.
+
+IIR_Elsif: unused/unimplemented.
+
+IIR_SelectedWaveform: unused/unimplemented.  A selected signal
+assignemnt is expanded into its equivalent process.
+
+IIR_Simultanous*: unused/unimplemented.
+
+IIR_ElementAssociation, IIR_IndexedAssociation: new, used for
+aggregates.
+
+IIR_AttributeValue: new, used for user defined attributes.
+
+
+Lists
+-----
+
+Lists are currently a cheap cop out.  They don't implement any of the
+baroque ADT stuff from AIRE, but are simply singly linked lists with a
+first and rest pointer.  I think the AIRE interface could be provided
+but is not very useful.
+
+Not all lists have been implemented, only those that are actually
+used.  Some new lists are also there.
+
+IIR_GenericList, IIR_PortList: not used because they are not derived
+from IIR_InterfaceList and I want to have `generic' functions that can
+work both on a GenericList and a PortList.  This is no big loss.
+
+
+IIR_TypeDefinition and IIR_NatureDefinition Derived Classes
+-----------------------------------------------------------
+
+Here are many significant deviations from AIRE.  I had especially
+little respect when I did this part of FIRE and it shows.
+
+All IIR_TypeDefinitions have lost their "Definition" suffix.  Thus,
+IIR_TypeDefinition is now IIR_Type.  This is easy to revert of course.
+
+Types have a pointer to their declaration.
+
+Scalar types have no range (it is contained in their primary
+subtype(?)).
+
+Subtypes are arranged differently.  Subtypes form their own hierachy:
+
+ IIR_Type:                Type base
+   IIR_Subtype:           Type immediate_base, FunctionDeclaration res_func
+      IIR_ScalarSubtype:  Range range
+      IIR_ArraySubtype:   TypeList constraint
+
+This avoids gratitous duplication of code for the original multitude
+of similar Subtypes that weren't related hierachically.
+
+The range of a ScalarSubtype is denoted by the IIR_Range hierachy.
+This allows not only for explicit ranges but also for ranges denoted
+by attributes.
+
+There is no IIR_RangeTypeDefinition.
+
+Record and Array types are derived from the new IIR_CompositeType.
+
+ArrayTypes are not restricted to one dimension.  This is important.
+We can either support it directly in the spec or everybody is forced
+to non-portably kluge around it.  See SAVANT.
+
+IIR_Signature: unused/unimplemented.
+
+IIR_NatureDefinition: unused/unimplemented.
+
+
+IIR_Declaration Derived Classes
+-------------------------------
+
+In addition to the declarations, we also maintain the nested
+declarative regions in the graph, so that backends can walk them in a
+generic way.
+
+IIR_Declaration: moved attributes to here and use AttributeValue
+instead of AttributeSpecification.  Has pointer to containing
+IIR_DeclarativeRegion.
+
+IIR_DeclarativeRegion: new.  Chains declarative regions of one scope
+together with a `continued' pointer.  Has list of contained
+IIR_Declarations.  This means that declarations that have their own
+IIR_DeclarationList in AIRE are now derived from IIR_DeclarativeRegion
+and inherit the list.  Makes much more sense.
+
+IIR_LoopDeclarativeRegion: new.
+
+IIR_FunctionDeclaration: pure is just a boolean.
+
+IIR_EnumerationLiteral: has no position info.
+
+IIR_NatureElementDeclaration: unused/unimplemented.
+
+IIR_SubtypeDeclaration: derived from TypeDeclaration.
+
+IIR_NatureDeclaration: unused/unimplemented.
+
+IIR_SubnatureDeclaration: unused/unimplemented.
+
+IIR_ObjectDeclaration: added initial_value.
+
+IIR_ConstantDeclaration, IIR_VariableDeclaration,
+IIR_SharedVariableDeclaration, IIR_SignalDeclaration: no value, use
+initial_value of ObjectDelcaration.  The graph is not intented to be
+used at simulation-time.
+
+IIR_TerminalDeclaration, IIR_QuantityDeclaration: unused/unimplemented.
+
+IIR_InterfaceDeclaration: derived from IIR_ObjectDeclaration.  Added
+`boolean buffer'.  No value, see IIR_ConstantDeclaration, et al.
+
+IIR_TerminalInterfaceDeclaration, IIR_QuantityInterfaceDeclaration:
+unused/unimplemented.
+
+IIR_AliasDeclaration: derived from IIR_ObjectDeclaration.  No name,
+initial_value refers to aliased object (via ObjectReference,
+presumably).
+
+IIR_ComponentDeclaration: derived from IIR_DeclarativeRegion.  This
+probably can be fixed but it doesn't hurt either.
+
+IIR_Group*: unused/unimplemented.  Needs fixing.
+
+IIR_LibraryUnit: added library_name to help identify units.
+
+IIR_EntityDeclaration: has no `architectures' pointer.  The full list
+of architectures can not be determined when parsing the entity
+declaration and the graph should not be mutated later.  Finding all
+architectures of an entity is a useful thing but I do not consider it
+to be the job of the frontend. More often than not, the architectures
+aren't needed anyway.
+
+IIR_PackageDeclaration: like architectures of entities, I consider it
+to be out of the scope of the frontend to find the package body for a
+package.
+
+IIR_PackageBodyDeclaration: rather, a package body points back to its
+package declaration.
+
+IIR_PhysicalUnit: added pointer to defining PhysicalType.
+
+IIR_AttributeSpecification: unused/unimplemented.  Use AttributeValue
+instead, much simpler.
+
+IIR_ConfigurationSpecification: has no component_name, entity_aspect,
+and instantiation_list but simply a `LibraryUnit unit'.
+
+IIR_DisconnectSpecification: used for only one signal, which is
+denoted by `IIR_Expression guarded_signal'.
+
+IIR_LibraryClause: has no logical_name.
+
+IIR_UseClause: has no selected_name, but a direct pointer to the used
+unit.
+
+
+IIR_Name derived Classes
+------------------------
+
+No Name class is used/implemented.  All references are resolved.
+Attributes are implemented as Expressions.
+
+
+IIR_Expression Derived Classes
+------------------------------
+
+No MonadicOperator or DyadicOperator is implemented.  They are
+expressed by function calls that point to the declaration of the
+operator.
+
+We need a number of new node types to refer to objects and literals.
+AIRE seems to allow literals and objects directly in expressions, but
+FIRE doesn't.  This and most of the other changes are done to make the
+life of the backend easier.  By using these additional `indirect'
+classes, we can be more precise and explicit.
+
+IIR_AbstractLiteralExpression: new, used to refer to IIR_AbstractLiterals.
+
+IIR_PhysicalLiteral: derived from AbstractLiteralExpression.
+
+IIR_ArrayLiteralExpression: new, used to refer to IIR_StringLiterals.
+
+IIR_EnumLiteralReference: new, used to refer to
+IIR_EnumerationLiterals.
+
+IIR_NullExpression, IIR_OpenExpression: new, useful.
+
+IIR_Aggregate: split into RecordAggregate and ArrayAggregate with
+their own specialized Element/IndexedAssociations.
+
+IIR_OthersInitialization: unused/unimplemented.
+
+IIR_FunctionCall: `implementation' is called `function', for no good
+reason.
+
+IIR_ObjectReference: new, used to refer to objects.  The hierarchy is
+
+    ObjectReference
+      SimpleReference:        ObjectDeclaration object
+      AccessReference:        Expression access
+      RecordReference:        Expression record, ElementDeclaration element
+      GenericArrayReference:  Expression array
+        ArrayReference:       ExpressionList indices
+        SliceReference:       Range range
+
+Builtin attributes are also derived from Expression.  They are mostly
+copied verbatim from the old VAUL definitions.  There is no similarity
+to the unimplemented AIRE Attribute classes.  The similarity could be
+achieved, but they should remain Expressions.
+
+
+IIR_SequentialStatement Derived Classes
+---------------------------------------
+
+IIR_SequentialStatement: moved label from unimplemented IIR_Statement
+to here.
+
+IIR_ProcedureCallStatement: has no procedure_name, points directly to
+ProcedureDeclaration.
+
+IIR_IfStatement: does not use ElsIf.  Instead, if/elsif chains are
+rewritten into equivalent nested ifs.
+
+IIR_LoopStatement: new, used as common base of ForLoopStatement and
+WhileLoopStatement.  Does not have declaration list, but points to
+LoopDeclarativeRegion.
+
+IIR_LoopControlStatement: new, used as common base of NextStatement,
+ExitStatement.
+
+
+IIR_ConcurrentStatement Derived Classes
+---------------------------------------
+
+IIR_ConcurrentStatement: derived from DeclarativeRegion, for
+historical reasons.  Needs to be fixed, maybe.
+
+IIR_ProcessStatement: added `boolean guarded'.
+
+IIR_ConcurrentProcedureCallStatement, ConcurrentAssertionStatement,
+ConcurrentConditionalSignalAssignment,
+ConcurrentSelectedSignalAssignment: unused/unimplemented.  They are
+rewritten into their equivalent ProcessStatement.
+
+IIR_ComponentInstantiationStatement: added pointer to
+ConfigurationSpecification that configures this thing.
+
+IIR_ConcurrentGenerateStatement: new, used as common base class of
+ConcurrentGenerateForStatement and ConcurrentGenerateIfStatement.
+
+
+IIR_SimultanousStatement Derived Classes
+----------------------------------------
+
+unused/unimplemented.

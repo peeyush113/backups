@@ -1,0 +1,238 @@
+@c -*- mode: texinfo; masterfile: "libfire.texi"; -*-
+
+@node FIRE Reference
+@chapter FIRE Reference
+
+As mentioned in the introduction, FIRE stands for Feeble Intermediate
+Representation with Extensibility.  This is of course a pun on AIRE, the
+Advanced Intermediate Representation with Extensibility.
+
+AIRE defines a sophisticated data structure that can be used to share
+design information between tool components, as they state in the
+extensive specification document@footnote{insert URL}.  I intend to make
+FIRE compliant with the AIRE specification sometime and then abandon the
+name FIRE; or to just out-live AIRE and stick to FIRE.
+
+But right now and in the near future, my focus is more on the general
+mechanisms used to implement the basic features of a useful abstract
+syntax tree.  FIRE will be superficially similar to AIRE and I will of
+course try to avoid gratitous incompatibilities between them.  But the
+extension mechanism will be completely different, for example.
+
+@menu
+* Overview::                    
+* Primitive Types::             
+* Base Class::                  
+* Literals::                    
+* Tupels::                      
+* Lists::                       
+* Type Definitions::            
+* Declarations::                
+* Expressions::                 
+* Attributes::                  
+* Sequential Statements::       
+* Concurrent Statements::       
+* All together now::            
+@end menu
+
+@node Overview
+@section Overview
+
+FIRE defines a set of node types and a set of primitive types that
+appear as payload on the nodes.  The names of these types follow the
+AIRE specification quite closely.
+
+The precise mechanics of actually using @samp{libfire} are undocumented
+at this time.  This is going to change of course.
+
+The node types have a prefix of @samp{IIR_}.  For each defined node type
+@samp{IIR_Foo}, there is a C++ struct type @samp{IIR_Foo}, a type that
+is a pointer to this struct with the name @samp{pIIR_Foo}, and a kind
+identifier named @samp{IR_FOO}.
+
+The primitive types have a prefix of @samp{IR_}.
+
+Here are all defined FIRE node types, arranged in a hierarchy.
+
+@example
+@typehierarchy fire
+@end example
+
+@node Primitive Types
+@section Primitive Types
+
+FIRE defines the following C++ types.
+
+@table @code
+@item IR_Character
+A character represented as a unsigned integer.  Right now, all we can
+say about this is that it can contain ASCII character codes.  Anything
+beyond that is still undecided.
+@item IR_String
+A read only string of @code{IR_Characters}.  See below for more
+information on this type.
+@item IR_Kind
+An alias for the @code{tree_kind} type of the basic tree support
+facility.
+@item IR_SignalKind
+An enumeration with the following members: @code{IR__NO_SIGNAL_KIND},
+@code{IR_REGISTER_KIND}, and @code{IR_BUS_KIND}.
+@item IR_Mode
+An enumeration with the following members: @code{IR_UNKNOWN_MODE},
+  @code{IR_IN_MODE}, @code{IR_OUT_MODE}, @code{IR_INOUT_MODE},
+  @code{IR_BUFFER_MODE}, and @code{IR_LINKAGE_MODE}.
+@item IR_Pure
+An enumeration with the following members: @code{IR_UNKNOWN_PURE},
+  @code{IR_PURE_FUNCTION}, @code{IR_IMPURE_FUNCTION},
+  @code{IR_PURE_PROCEDURAL}, and @code{IR_IMPURE_PROCEDURAL}.
+@item IR_Direction
+An enumeration with the following members: @code{IR_UNKNOWN_DIRECTION},
+  @code{IR_DIRECTION_UP}, and @code{IR_DIRECTION_DOWN}.
+@item IR_DelayMechanism
+An enumeration with the following members: @code{IR_UNKNOWN_DELAY},
+  @code{IR_INERTIAL_DELAY}, and @code{IR_TRANSPORT_DELAY}.
+@end table
+
+@subsection The @code{IR_String} type
+
+A @code{IR_String} can hold a vector of @code{IR_Character}s.  The
+length of that vector is determined by an explicit count so that the
+vector can contain arbitrary @code{IR_Character} values, including
+zeros.  The contents of the vector is read only and @code{IR_String}s
+are allowed to share the memory of this vector.  In fact, copying a
+@code{IR_String} does not copy the vector but merely makes a new
+reference to it.  When the last reference to the vector goes away, it is
+finally freed.
+
+A @code{IR_String} supports the following operations.
+
+@deftypemethod IR_String {} IR_String (IR_Character *chars, int len)
+Construct a new @code{IR_String} from @var{chars} and @var{len}.  The
+@code{IR_string} allocates new memory for its vector and copies the
+contents of @var{chars} into it, it does not retain the @var{chars}
+pointer.
+@end deftypemethod
+
+@deftypemethod IR_String {} IR_String (char *chars)
+Construct a new @code{IR_String} from the zero-terminated string
+@var{chars}.  The @code{IR_string} allocates new memory for its vector
+and copies the contents of @var{chars} into it, it does not retain the
+@var{chars} pointer.
+@end deftypemethod
+
+@deftypemethod IR_String {} IR_String (IR_String &str)
+Construct a new @code{IR_String} by copying @var{str}.  The new
+@code{IR_String} will refer to the same vector as @var{str}, so this is
+an efficient operation.
+@end deftypemethod
+
+@deftypemethod IR_String int len ()
+Return the number of characters stored in the the @code{IR_String}.
+@end deftypemethod
+
+@deftypemethod IR_String IR_Character operator [] (int i)
+Return the character at index @var{i}.  No bounds checking is performed.
+@end deftypemethod
+
+@iftex
+@deftypefun ostream@& operator << (ostream @&o, IR_String @&str)
+Print @var{str} to @var{o} and return @var{o}.
+@end deftypefun
+@end iftex
+@ifinfo
+@deftypefun ostream& operator<< (ostream &o, IR_String &str)
+Print @var{str} to @var{o} and return @var{o}.
+@end deftypefun
+@end ifinfo
+
+@node Base Class
+@section Base Class
+
+@defnode IIR_Root
+At the root of the FIRE node type hierachy is @code{IIR_Root}.  It's
+only slot @code{pos} can be used to record the source location of a
+node.
+@end defnode
+
+There two predefined nodes that inherit from @code{IIR_PosInfo}.  You
+can define additional ones.
+
+@defnode IIR_PosInfo
+@end defnode
+
+@defnode IIR_PosInfo_TextFile
+This node represents a position in a text file.  The line numbers start
+with 1.
+@end defnode
+
+@defnode IIR_PosInfo_Sheet
+This node represents a position in a 2 dimensional view of a circuit.
+The units of the coordinates are undefined as of now.
+@end defnode
+
+@node Literals
+@section Literals
+
+Literals represent tokens of the VHDL text that are not further
+destructured on the grapg level.  They are typically referenced from
+expressions, but they are not themselves expressions.
+
+@defnode IIR_Literal
+@end defnode
+
+@defnode IIR_TextLiteral
+This is the base node of all literals that have a textual value.
+@end defnode
+
+@defnode IIR_Identifier
+This represents the name of a declared item.  It is not directly
+referenced but indirectly via a @code{IIR_ObjectReference} that points
+to the declaration.
+@end defnode
+
+@defnode IIR_CharacterLiteral
+This is used for names of enumeration literals, which are referenced
+by @code{IIR_ObjectReference}s, just like @code{IIR_Identifier}s.
+@end defnode
+
+@defnode IIR_StringLiteral
+This is referenced by a @code{IIR_ArrayLiteralExpression}.
+@end defnode
+
+@node Tupels
+@section Tupels
+
+@node Lists
+@section Lists
+
+@node Type Definitions
+@section Type Definitions
+
+@node Declarations
+@section Declarations
+
+@node Expressions
+@section Expressions
+
+@node Attributes
+@section Attributes
+
+@node Sequential Statements
+@section Sequential Statements
+
+@node Concurrent Statements
+@section Concurrent Statements
+
+@node All together now
+@section All together now
+
+In alphabetic order.
+
+@allnodedocs fire
+
+@contents
+
+@bye
+
+@c
+@c 

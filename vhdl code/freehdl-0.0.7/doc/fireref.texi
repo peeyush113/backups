@@ -1,0 +1,4029 @@
+@c -*- mode: texinfo; masterfile: "libfire.texi"; -*-
+
+@node FIRE Reference
+@chapter FIRE Reference
+
+As mentioned in the introduction, FIRE stands for Feeble Intermediate
+Representation with Extensibility.  This is of course a pun on AIRE, the
+Advanced Intermediate Representation with Extensibility.
+
+AIRE defines a sophisticated data structure that can be used to share
+design information between tool components, as they state in the
+extensive specification document@footnote{insert URL}.  I intend to make
+FIRE compliant with the AIRE specification sometime and then abandon the
+name FIRE; or to just out-live AIRE and stick to FIRE.
+
+But right now and in the near future, my focus is more on the general
+mechanisms used to implement the basic features of a useful abstract
+syntax tree.  FIRE will be superficially similar to AIRE and I will of
+course try to avoid gratitous incompatibilities between them.  But the
+extension mechanism will be completely different, for example.
+
+@menu
+* Overview::                    
+* Primitive Types::             
+* Base Class::                  
+* Literals::                    
+* Tupels::                      
+* Lists::                       
+* Type Definitions::            
+* Declarations::                
+* Expressions::                 
+* Attributes::                  
+* Sequential Statements::       
+* Concurrent Statements::       
+* All together now::            
+@end menu
+
+@node Overview
+@section Overview
+
+FIRE defines a set of node types and a set of primitive types that
+appear as payload on the nodes.  The names of these types follow the
+AIRE specification quite closely.
+
+The precise mechanics of actually using @samp{libfire} are undocumented
+at this time.  This is going to change of course.
+
+The node types have a prefix of @samp{IIR_}.  For each defined node type
+@samp{IIR_Foo}, there is a C++ struct type @samp{IIR_Foo}, a type that
+is a pointer to this struct with the name @samp{pIIR_Foo}, and a kind
+identifier named @samp{IR_FOO}.
+
+The primitive types have a prefix of @samp{IR_}.
+
+Here are all defined FIRE node types, arranged in a hierarchy.
+
+@example
+tree_base_node
+|
++-IIR_Root
+| |
+| +-IIR_SequentialStatement
+| | |
+| | +-IIR_NullStatement
+| | |
+| | +-IIR_ReturnStatement
+| | |
+| | +-IIR_LoopControlStatement
+| | | |
+| | | +-IIR_ExitStatement
+| | | |
+| | | \-IIR_NextStatement
+| | |
+| | +-IIR_LoopStatement
+| | | |
+| | | +-IIR_WhileLoopStatement
+| | | |
+| | | \-IIR_ForLoopStatement
+| | |
+| | +-IIR_CaseStatement
+| | |
+| | +-IIR_IfStatement
+| | |
+| | +-IIR_ProcedureCallStatement
+| | |
+| | +-IIR_VariableAssignmentStatement
+| | |
+| | +-IIR_SignalAssignmentStatement
+| | |
+| | +-IIR_ReportStatement
+| | |
+| | +-IIR_AssertionStatement
+| | |
+| | \-IIR_WaitStatement
+| |
+| +-IIR_Expression
+| | |
+| | +-IIR_ValueAttr
+| | | |
+| | | \-IIR_AttrTypeValue
+| | |   |
+| | |   +-IIR_Attr_LENGTH
+| | |   |
+| | |   +-IIR_Attr_ASCENDING
+| | |   |
+| | |   +-IIR_Attr_HIGH
+| | |   |
+| | |   +-IIR_Attr_LOW
+| | |   |
+| | |   +-IIR_Attr_RIGHT
+| | |   |
+| | |   \-IIR_Attr_LEFT
+| | |
+| | +-IIR_FunctionAttr
+| | | |
+| | | +-IIR_AttrArrayFunc
+| | | | |
+| | | | +-IIR_Attr_ArrayLENGTH
+| | | | |
+| | | | +-IIR_Attr_ArrayASCENDING
+| | | | |
+| | | | +-IIR_Attr_ArrayLOW
+| | | | |
+| | | | +-IIR_Attr_ArrayHIGH
+| | | | |
+| | | | +-IIR_Attr_ArrayRIGHT
+| | | | |
+| | | | \-IIR_Attr_ArrayLEFT
+| | | |
+| | | +-IIR_AttrTypeFunc
+| | | | |
+| | | | +-IIR_Attr_RIGHTOF
+| | | | |
+| | | | +-IIR_Attr_LEFTOF
+| | | | |
+| | | | +-IIR_Attr_PRED
+| | | | |
+| | | | +-IIR_Attr_SUCC
+| | | | |
+| | | | +-IIR_Attr_VAL
+| | | | |
+| | | | +-IIR_Attr_POS
+| | | | |
+| | | | +-IIR_Attr_VALUE
+| | | | |
+| | | | \-IIR_Attr_IMAGE
+| | | |
+| | | \-IIR_AttrSigFunc
+| | |   |
+| | |   +-IIR_Attr_DRIVING_VALUE
+| | |   |
+| | |   +-IIR_Attr_DRIVING
+| | |   |
+| | |   +-IIR_Attr_LAST_VALUE
+| | |   |
+| | |   +-IIR_Attr_LAST_ACTIVE
+| | |   |
+| | |   +-IIR_Attr_LAST_EVENT
+| | |   |
+| | |   +-IIR_Attr_ACTIVE
+| | |   |
+| | |   \-IIR_Attr_EVENT
+| | |
+| | +-IIR_ObjectReference
+| | | |
+| | | +-IIR_SignalAttr
+| | | | |
+| | | | +-IIR_Attr_TRANSACTION
+| | | | |
+| | | | +-IIR_Attr_QUIET
+| | | | |
+| | | | +-IIR_Attr_STABLE
+| | | | |
+| | | | \-IIR_Attr_DELAYED
+| | | |
+| | | +-IIR_GenericArrayReference
+| | | | |
+| | | | +-IIR_SliceReference
+| | | | |
+| | | | \-IIR_ArrayReference
+| | | |
+| | | +-IIR_RecordReference
+| | | |
+| | | +-IIR_AccessReference
+| | | |
+| | | \-IIR_SimpleReference
+| | |
+| | +-IIR_OpenExpression
+| | |
+| | +-IIR_Allocator
+| | |
+| | +-IIR_TypeConversion
+| | |
+| | +-IIR_QualifiedExpression
+| | |
+| | +-IIR_FunctionCall
+| | |
+| | +-IIR_Aggregate
+| | | |
+| | | +-IIR_ArrayAggregate
+| | | | |
+| | | | \-IIR_ArtificialArrayAggregate
+| | | |
+| | | \-IIR_RecordAggregate
+| | |   |
+| | |   \-IIR_ArtificialRecordAggregate
+| | |
+| | +-IIR_NullExpression
+| | |
+| | +-IIR_EnumLiteralReference
+| | |
+| | +-IIR_ArrayLiteralExpression
+| | |
+| | \-IIR_AbstractLiteralExpression
+| |   |
+| |   \-IIR_PhysicalLiteral
+| |
+| +-IIR_Declaration
+| | |
+| | +-IIR_UseClause
+| | |
+| | +-IIR_LibraryClause
+| | |
+| | +-IIR_Label
+| | |
+| | +-IIR_DisconnectSpecification
+| | |
+| | +-IIR_PhysicalUnit
+| | |
+| | +-IIR_LibraryDeclaration
+| | |
+| | +-IIR_AttributeDeclaration
+| | |
+| | +-IIR_ObjectDeclaration
+| | | |
+| | | +-IIR_InterfaceDeclaration
+| | | | |
+| | | | +-IIR_FileInterfaceDeclaration
+| | | | |
+| | | | +-IIR_SignalInterfaceDeclaration
+| | | | |
+| | | | +-IIR_VariableInterfaceDeclaration
+| | | | |
+| | | | \-IIR_ConstantInterfaceDeclaration
+| | | |
+| | | +-IIR_FileDeclaration
+| | | |
+| | | +-IIR_SignalDeclaration
+| | | |
+| | | +-IIR_VariableDeclaration
+| | | | |
+| | | | \-IIR_SharedVariableDeclaration
+| | | |
+| | | \-IIR_ConstantDeclaration
+| | |
+| | +-IIR_TypeDeclaration
+| | | |
+| | | \-IIR_SubtypeDeclaration
+| | |
+| | +-IIR_ElementDeclaration
+| | |
+| | +-IIR_EnumerationLiteral
+| | |
+| | \-IIR_DeclarativeRegion
+| |   |
+| |   +-IIR_ConcurrentStatement
+| |   | |
+| |   | +-IIR_ConcurrentGenerateStatement
+| |   | | |
+| |   | | +-IIR_ConcurrentGenerateIfStatement
+| |   | | |
+| |   | | \-IIR_ConcurrentGenerateForStatement
+| |   | |
+| |   | +-IIR_ComponentInstantiationStatement
+| |   | |
+| |   | +-IIR_ProcessStatement
+| |   | | |
+| |   | | +-IIR_SensitizedProcessStatement
+| |   | | |
+| |   | | \-IIR_ImplicitProcessStatement
+| |   | |
+| |   | \-IIR_BlockStatement
+| |   |
+| |   +-IIR_ConfigurationItem
+| |   | |
+| |   | +-IIR_ComponentConfiguration
+| |   | |
+| |   | \-IIR_BlockConfiguration
+| |   |
+| |   +-IIR_ArchitectureRef
+| |   |
+| |   +-IIR_LibraryUnit
+| |   | |
+| |   | +-IIR_ConfigurationDeclaration
+| |   | |
+| |   | +-IIR_PackageBodyDeclaration
+| |   | |
+| |   | +-IIR_PackageDeclaration
+| |   | |
+| |   | +-IIR_ArchitectureDeclaration
+| |   | |
+| |   | \-IIR_EntityDeclaration
+| |   |
+| |   +-IIR_ComponentDeclaration
+| |   |
+| |   +-IIR_SubprogramDeclaration
+| |   | |
+| |   | +-IIR_FunctionDeclaration
+| |   | | |
+| |   | | \-IIR_PredefinedFunctionDeclaration
+| |   | |
+| |   | \-IIR_ProcedureDeclaration
+| |   |   |
+| |   |   \-IIR_PredefinedProcedureDeclaration
+| |   |
+| |   \-IIR_LoopDeclarativeRegion
+| |
+| +-IIR_Type
+| | |
+| | +-IIR_FileType
+| | |
+| | +-IIR_AccessType
+| | |
+| | +-IIR_CompositeType
+| | | |
+| | | +-IIR_ArrayType
+| | | |
+| | | \-IIR_RecordType
+| | |
+| | +-IIR_ScalarType
+| | | |
+| | | +-IIR_PhysicalType
+| | | |
+| | | +-IIR_FloatingType
+| | | |
+| | | +-IIR_IntegerType
+| | | |
+| | | \-IIR_EnumerationType
+| | |
+| | \-IIR_Subtype
+| |   |
+| |   +-IIR_ArraySubtype
+| |   |
+| |   +-IIR_RecordSubtype
+| |   |
+| |   \-IIR_ScalarSubtype
+| |
+| +-IIR_Range
+| | |
+| | +-IIR_ArrayRange
+| | | |
+| | | +-IIR_Attr_ArrayREVERSE_RANGE
+| | | |
+| | | \-IIR_Attr_ArrayRANGE
+| | |
+| | \-IIR_ExplicitRange
+| |
+| +-IIR_List
+| | |
+| | +-IIR_IdentifierList
+| | |
+| | +-IIR_ConfigurationSpecificationList
+| | |
+| | +-IIR_ComponentInstantiationList
+| | |
+| | +-IIR_ElementAssociationList
+| | |
+| | +-IIR_IndexedAssociationList
+| | |
+| | +-IIR_ExpressionList
+| | |
+| | +-IIR_TypeList
+| | |
+| | +-IIR_WaveformList
+| | |
+| | +-IIR_UnitList
+| | |
+| | +-IIR_SequentialStatementList
+| | |
+| | +-IIR_LibraryUnitList
+| | |
+| | +-IIR_InterfaceList
+| | |
+| | +-IIR_EnumerationLiteralList
+| | |
+| | +-IIR_EntityClassEntryList
+| | |
+| | +-IIR_ElementDeclarationList
+| | |
+| | +-IIR_DeclarationList
+| | |
+| | +-IIR_ConfigurationItemList
+| | |
+| | +-IIR_ConcurrentStatementList
+| | |
+| | +-IIR_ChoiceList
+| | |
+| | +-IIR_CaseStatementAlternativeList
+| | |
+| | +-IIR_AttributeValueList
+| | |
+| | \-IIR_AssociationList
+| |
+| +-IIR_Tuple
+| | |
+| | +-IIR_ConfigurationSpecification
+| | |
+| | +-IIR_BindingIndication
+| | |
+| | +-IIR_AttributeValue
+| | |
+| | +-IIR_IndexedAssociation
+| | | |
+| | | +-IIR_OthersIndexedAssociation
+| | | |
+| | | +-IIR_RangeIndexedAssociation
+| | | | |
+| | | | \-IIR_SliceIndexedAssociation
+| | | |
+| | | \-IIR_SingleIndexedAssociation
+| | |
+| | +-IIR_ElementAssociation
+| | |
+| | +-IIR_WaveformElement
+| | |
+| | +-IIR_EntityClassEntry
+| | |
+| | +-IIR_Choice
+| | | |
+| | | +-IIR_ChoiceByOthers
+| | | |
+| | | +-IIR_ChoiceByRange
+| | | |
+| | | \-IIR_ChoiceByExpression
+| | |
+| | +-IIR_CaseStatementAlternative
+| | |
+| | \-IIR_AssociationElement
+| |   |
+| |   +-IIR_AssociationElementOpen
+| |   |
+| |   \-IIR_AssociationElementByExpression
+| |
+| +-IIR_Literal
+| | |
+| | +-IIR_AbstractLiteral
+| | | |
+| | | +-IIR_FloatingPointLiteral
+| | | |
+| | | \-IIR_IntegerLiteral
+| | |
+| | \-IIR_TextLiteral
+| |   |
+| |   +-IIR_StringLiteral
+| |   |
+| |   +-IIR_CharacterLiteral
+| |   |
+| |   \-IIR_Identifier
+| |
+| \-IIR_Dummy
+|   |
+|   \-IIR_Signature
+|
+\-IIR_PosInfo
+  |
+  +-IIR_PosInfo_Sheet
+  |
+  \-IIR_PosInfo_TextFile
+@end example
+
+@node Primitive Types
+@section Primitive Types
+
+FIRE defines the following C++ types.
+
+@table @code
+@item IR_Character
+A character represented as a unsigned integer.  Right now, all we can
+say about this is that it can contain ASCII character codes.  Anything
+beyond that is still undecided.
+@item IR_String
+A read only string of @code{IR_Characters}.  See below for more
+information on this type.
+@item IR_Kind
+An alias for the @code{tree_kind} type of the basic tree support
+facility.
+@item IR_SignalKind
+An enumeration with the following members: @code{IR__NO_SIGNAL_KIND},
+@code{IR_REGISTER_KIND}, and @code{IR_BUS_KIND}.
+@item IR_Mode
+An enumeration with the following members: @code{IR_UNKNOWN_MODE},
+  @code{IR_IN_MODE}, @code{IR_OUT_MODE}, @code{IR_INOUT_MODE},
+  @code{IR_BUFFER_MODE}, and @code{IR_LINKAGE_MODE}.
+@item IR_Pure
+An enumeration with the following members: @code{IR_UNKNOWN_PURE},
+  @code{IR_PURE_FUNCTION}, @code{IR_IMPURE_FUNCTION},
+  @code{IR_PURE_PROCEDURAL}, and @code{IR_IMPURE_PROCEDURAL}.
+@item IR_Direction
+An enumeration with the following members: @code{IR_UNKNOWN_DIRECTION},
+  @code{IR_DIRECTION_UP}, and @code{IR_DIRECTION_DOWN}.
+@item IR_DelayMechanism
+An enumeration with the following members: @code{IR_UNKNOWN_DELAY},
+  @code{IR_INERTIAL_DELAY}, and @code{IR_TRANSPORT_DELAY}.
+@end table
+
+@subsection The @code{IR_String} type
+
+A @code{IR_String} can hold a vector of @code{IR_Character}s.  The
+length of that vector is determined by an explicit count so that the
+vector can contain arbitrary @code{IR_Character} values, including
+zeros.  The contents of the vector is read only and @code{IR_String}s
+are allowed to share the memory of this vector.  In fact, copying a
+@code{IR_String} does not copy the vector but merely makes a new
+reference to it.  When the last reference to the vector goes away, it is
+finally freed.
+
+A @code{IR_String} supports the following operations.
+
+@deftypemethod IR_String {} IR_String (IR_Character *chars, int len)
+Construct a new @code{IR_String} from @var{chars} and @var{len}.  The
+@code{IR_string} allocates new memory for its vector and copies the
+contents of @var{chars} into it, it does not retain the @var{chars}
+pointer.
+@end deftypemethod
+
+@deftypemethod IR_String {} IR_String (char *chars)
+Construct a new @code{IR_String} from the zero-terminated string
+@var{chars}.  The @code{IR_string} allocates new memory for its vector
+and copies the contents of @var{chars} into it, it does not retain the
+@var{chars} pointer.
+@end deftypemethod
+
+@deftypemethod IR_String {} IR_String (IR_String &str)
+Construct a new @code{IR_String} by copying @var{str}.  The new
+@code{IR_String} will refer to the same vector as @var{str}, so this is
+an efficient operation.
+@end deftypemethod
+
+@deftypemethod IR_String int len ()
+Return the number of characters stored in the the @code{IR_String}.
+@end deftypemethod
+
+@deftypemethod IR_String IR_Character operator [] (int i)
+Return the character at index @var{i}.  No bounds checking is performed.
+@end deftypemethod
+
+@iftex
+@deftypefun ostream@& operator << (ostream @&o, IR_String @&str)
+Print @var{str} to @var{o} and return @var{o}.
+@end deftypefun
+@end iftex
+@ifinfo
+@deftypefun ostream& operator<< (ostream &o, IR_String &str)
+Print @var{str} to @var{o} and return @var{o}.
+@end deftypefun
+@end ifinfo
+
+@node Base Class
+@section Base Class
+
+@deftp Node IIR_Root
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab tree_base_node
+@item Inherited by: @tab IIR_SequentialStatement
+@item @tab IIR_Expression
+@item @tab IIR_Declaration
+@item @tab IIR_Type
+@item @tab IIR_Range
+@item @tab IIR_List
+@item @tab IIR_Tuple
+@item @tab IIR_Literal
+@item @tab IIR_Dummy
+@item Referenced by: @tab none
+@item Inherited slots: @tab none
+@item Direct slots: @tab @t{pIIR_PosInfo pos}
+@end multitable
+
+At the root of the FIRE node type hierachy is @code{IIR_Root}.  It's
+only slot @code{pos} can be used to record the source location of a
+node.
+@end deftp
+
+There two predefined nodes that inherit from @code{IIR_PosInfo}.  You
+can define additional ones.
+
+@deftp Node IIR_PosInfo
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab tree_base_node
+@item Inherited by: @tab IIR_PosInfo_Sheet
+@item @tab IIR_PosInfo_TextFile
+@item Referenced by: @tab IIR_Root
+@item Inherited slots: @tab none
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PosInfo_TextFile
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_PosInfo
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab none
+@item Direct slots: @tab @t{const char* file_name}
+@item @tab @t{int line_number}
+@end multitable
+
+This node represents a position in a text file.  The line numbers start
+with 1.
+@end deftp
+
+@deftp Node IIR_PosInfo_Sheet
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_PosInfo
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab none
+@item Direct slots: @tab @t{const char* sheet_name}
+@item @tab @t{int x_coordinate}
+@item @tab @t{int y_coordinate}
+@end multitable
+
+This node represents a position in a 2 dimensional view of a circuit.
+The units of the coordinates are undefined as of now.
+@end deftp
+
+@node Literals
+@section Literals
+
+Literals represent tokens of the VHDL text that are not further
+destructured on the grapg level.  They are typically referenced from
+expressions, but they are not themselves expressions.
+
+@deftp Node IIR_Literal
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_AbstractLiteral
+@item @tab IIR_TextLiteral
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_TextLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Literal
+@item Inherited by: @tab IIR_StringLiteral
+@item @tab IIR_CharacterLiteral
+@item @tab IIR_Identifier
+@item Referenced by: @tab IIR_Declaration
+@item @tab IIR_LibraryUnit
+@item @tab IIR_ArchitectureRef
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{IR_String text}
+@end multitable
+
+This is the base node of all literals that have a textual value.
+@end deftp
+
+@deftp Node IIR_Identifier
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_TextLiteral
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_IdentifierList
+@item @tab IIR_ConfigurationSpecification
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{IR_String text}
+@item Direct slots: @tab none
+@end multitable
+
+This represents the name of a declared item.  It is not directly
+referenced but indirectly via a @code{IIR_ObjectReference} that points
+to the declaration.
+@end deftp
+
+@deftp Node IIR_CharacterLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_TextLiteral
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{IR_String text}
+@item Direct slots: @tab none
+@end multitable
+
+This is used for names of enumeration literals, which are referenced
+by @code{IIR_ObjectReference}s, just like @code{IIR_Identifier}s.
+@end deftp
+
+@deftp Node IIR_StringLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_TextLiteral
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ArrayLiteralExpression
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{IR_String text}
+@item Direct slots: @tab none
+@end multitable
+
+This is referenced by a @code{IIR_ArrayLiteralExpression}.
+@end deftp
+
+@node Tupels
+@section Tupels
+
+@node Lists
+@section Lists
+
+@node Type Definitions
+@section Type Definitions
+
+@node Declarations
+@section Declarations
+
+@node Expressions
+@section Expressions
+
+@node Attributes
+@section Attributes
+
+@node Sequential Statements
+@section Sequential Statements
+
+@node Concurrent Statements
+@section Concurrent Statements
+
+@node All together now
+@section All together now
+
+In alphabetic order.
+
+@deftp Node IIR_ConcurrentGenerateIfStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ConcurrentGenerateStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_ConfigurationSpecificationList configuration_specifications}
+@item @tab @t{pIIR_ConcurrentStatementList concurrent_statement_part}
+@item Direct slots: @tab @t{pIIR_Expression condition}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConcurrentGenerateForStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ConcurrentGenerateStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_ConfigurationSpecificationList configuration_specifications}
+@item @tab @t{pIIR_ConcurrentStatementList concurrent_statement_part}
+@item Direct slots: @tab @t{pIIR_ConstantDeclaration generate_parameter_specification}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConcurrentGenerateStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ConcurrentStatement
+@item Inherited by: @tab IIR_ConcurrentGenerateIfStatement
+@item @tab IIR_ConcurrentGenerateForStatement
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_ConfigurationSpecificationList configuration_specifications}
+@item @tab @t{pIIR_ConcurrentStatementList concurrent_statement_part}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ComponentInstantiationStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ConcurrentStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ComponentInstantiationList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_BindingIndication binding}
+@item @tab @t{pIIR_BindingIndication configuration}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SensitizedProcessStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ProcessStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{bool postponed}
+@item @tab @t{bool guarded}
+@item @tab @t{pIIR_SequentialStatementList process_statement_part}
+@item Direct slots: @tab @t{pIIR_ExpressionList sensitivity_list}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ImplicitProcessStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ProcessStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{bool postponed}
+@item @tab @t{bool guarded}
+@item @tab @t{pIIR_SequentialStatementList process_statement_part}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ProcessStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ConcurrentStatement
+@item Inherited by: @tab IIR_SensitizedProcessStatement
+@item @tab IIR_ImplicitProcessStatement
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{bool postponed}
+@item @tab @t{bool guarded}
+@item @tab @t{pIIR_SequentialStatementList process_statement_part}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_BlockStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ConcurrentStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_Expression guard_expression}
+@item @tab @t{pIIR_InterfaceList generic_clause}
+@item @tab @t{pIIR_AssociationList generic_map_aspect}
+@item @tab @t{pIIR_InterfaceList port_clause}
+@item @tab @t{pIIR_AssociationList port_map_aspect}
+@item @tab @t{pIIR_ConfigurationSpecificationList configuration_specifications}
+@item @tab @t{pIIR_ConcurrentStatementList block_statement_part}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConcurrentStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_DeclarativeRegion
+@item Inherited by: @tab IIR_ConcurrentGenerateStatement
+@item @tab IIR_ComponentInstantiationStatement
+@item @tab IIR_ProcessStatement
+@item @tab IIR_BlockStatement
+@item Referenced by: @tab IIR_ConcurrentStatementList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_NullStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ReturnStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_SubprogramDeclaration enclosing_subprogram}
+@item @tab @t{pIIR_Expression return_expression}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ExitStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LoopControlStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item @tab @t{pIIR_LoopStatement loop}
+@item @tab @t{pIIR_Expression condition}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_NextStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LoopControlStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item @tab @t{pIIR_LoopStatement loop}
+@item @tab @t{pIIR_Expression condition}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_LoopControlStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab IIR_ExitStatement
+@item @tab IIR_NextStatement
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_LoopStatement loop}
+@item @tab @t{pIIR_Expression condition}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_WhileLoopStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LoopStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item @tab @t{pIIR_SequentialStatementList sequence_of_statements}
+@item @tab @t{pIIR_LoopDeclarativeRegion declarative_region}
+@item Direct slots: @tab @t{pIIR_Expression condition}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ForLoopStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LoopStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item @tab @t{pIIR_SequentialStatementList sequence_of_statements}
+@item @tab @t{pIIR_LoopDeclarativeRegion declarative_region}
+@item Direct slots: @tab @t{pIIR_ConstantDeclaration iterator}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_LoopStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab IIR_WhileLoopStatement
+@item @tab IIR_ForLoopStatement
+@item Referenced by: @tab IIR_LoopDeclarativeRegion
+@item @tab IIR_LoopControlStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_SequentialStatementList sequence_of_statements}
+@item @tab @t{pIIR_LoopDeclarativeRegion declarative_region}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_CaseStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_Expression expression}
+@item @tab @t{pIIR_CaseStatementAlternativeList case_statement_alternatives}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_IfStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_Expression condition}
+@item @tab @t{pIIR_SequentialStatementList then_sequence}
+@item @tab @t{pIIR_SequentialStatementList else_sequence}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ProcedureCallStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_ProcedureDeclaration procedure}
+@item @tab @t{pIIR_AssociationList actual_parameter_part}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_VariableAssignmentStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_Expression target}
+@item @tab @t{pIIR_Expression expression}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SignalAssignmentStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_Expression target}
+@item @tab @t{IR_DelayMechanism delay_mechanism}
+@item @tab @t{pIIR_Expression reject_time_expression}
+@item @tab @t{pIIR_WaveformList waveform}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ReportStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_Expression report_expression}
+@item @tab @t{pIIR_Expression severity_expression}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AssertionStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_Expression assertion_condition}
+@item @tab @t{pIIR_Expression report_expression}
+@item @tab @t{pIIR_Expression severity_expression}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_WaitStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SequentialStatement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Label label}
+@item Direct slots: @tab @t{pIIR_Expression condition_clause}
+@item @tab @t{pIIR_Expression timeout_clause}
+@item @tab @t{pIIR_ExpressionList sensitivity_list}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SequentialStatement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_NullStatement
+@item @tab IIR_ReturnStatement
+@item @tab IIR_LoopControlStatement
+@item @tab IIR_LoopStatement
+@item @tab IIR_CaseStatement
+@item @tab IIR_IfStatement
+@item @tab IIR_ProcedureCallStatement
+@item @tab IIR_VariableAssignmentStatement
+@item @tab IIR_SignalAssignmentStatement
+@item @tab IIR_ReportStatement
+@item @tab IIR_AssertionStatement
+@item @tab IIR_WaitStatement
+@item Referenced by: @tab IIR_SequentialStatementList
+@item @tab IIR_Label
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Label label}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ArrayLENGTH
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrArrayFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{int index}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ArrayASCENDING
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrArrayFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{int index}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ArrayLOW
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrArrayFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{int index}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ArrayHIGH
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrArrayFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{int index}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ArrayRIGHT
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrArrayFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{int index}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ArrayLEFT
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrArrayFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{int index}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AttrArrayFunc
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_FunctionAttr
+@item Inherited by: @tab IIR_Attr_ArrayLENGTH
+@item @tab IIR_Attr_ArrayASCENDING
+@item @tab IIR_Attr_ArrayLOW
+@item @tab IIR_Attr_ArrayHIGH
+@item @tab IIR_Attr_ArrayRIGHT
+@item @tab IIR_Attr_ArrayLEFT
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{int index}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_RIGHTOF
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_LEFTOF
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_PRED
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_SUCC
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_VAL
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_POS
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_VALUE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_IMAGE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AttrTypeFunc
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_FunctionAttr
+@item Inherited by: @tab IIR_Attr_RIGHTOF
+@item @tab IIR_Attr_LEFTOF
+@item @tab IIR_Attr_PRED
+@item @tab IIR_Attr_SUCC
+@item @tab IIR_Attr_VAL
+@item @tab IIR_Attr_POS
+@item @tab IIR_Attr_VALUE
+@item @tab IIR_Attr_IMAGE
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_LENGTH
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeValue
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ASCENDING
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeValue
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_HIGH
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeValue
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_LOW
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeValue
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_RIGHT
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeValue
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_LEFT
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrTypeValue
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AttrTypeValue
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ValueAttr
+@item Inherited by: @tab IIR_Attr_LENGTH
+@item @tab IIR_Attr_ASCENDING
+@item @tab IIR_Attr_HIGH
+@item @tab IIR_Attr_LOW
+@item @tab IIR_Attr_RIGHT
+@item @tab IIR_Attr_LEFT
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Type prefix}
+@item @tab @t{pIIR_Expression argument}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ValueAttr
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab IIR_AttrTypeValue
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_DRIVING_VALUE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrSigFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_DRIVING
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrSigFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_LAST_VALUE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrSigFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_LAST_ACTIVE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrSigFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_LAST_EVENT
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrSigFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ACTIVE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrSigFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_EVENT
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AttrSigFunc
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AttrSigFunc
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_FunctionAttr
+@item Inherited by: @tab IIR_Attr_DRIVING_VALUE
+@item @tab IIR_Attr_DRIVING
+@item @tab IIR_Attr_LAST_VALUE
+@item @tab IIR_Attr_LAST_ACTIVE
+@item @tab IIR_Attr_LAST_EVENT
+@item @tab IIR_Attr_ACTIVE
+@item @tab IIR_Attr_EVENT
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_ObjectReference signal}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_FunctionAttr
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab IIR_AttrArrayFunc
+@item @tab IIR_AttrTypeFunc
+@item @tab IIR_AttrSigFunc
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_TRANSACTION
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SignalAttr
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_QUIET
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SignalAttr
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab @t{pIIR_Expression duration}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_STABLE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SignalAttr
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab @t{pIIR_Expression duration}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_DELAYED
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SignalAttr
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ObjectReference signal}
+@item Direct slots: @tab @t{pIIR_Expression delay}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SignalAttr
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectReference
+@item Inherited by: @tab IIR_Attr_TRANSACTION
+@item @tab IIR_Attr_QUIET
+@item @tab IIR_Attr_STABLE
+@item @tab IIR_Attr_DELAYED
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_ObjectReference signal}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SliceReference
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_GenericArrayReference
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Expression array}
+@item Direct slots: @tab @t{pIIR_Range range}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArrayReference
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_GenericArrayReference
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Expression array}
+@item Direct slots: @tab @t{pIIR_ExpressionList indices}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_GenericArrayReference
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectReference
+@item Inherited by: @tab IIR_SliceReference
+@item @tab IIR_ArrayReference
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Expression array}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_RecordReference
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectReference
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Expression record}
+@item @tab @t{pIIR_ElementDeclaration element}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AccessReference
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectReference
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Expression access}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SimpleReference
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectReference
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_ObjectDeclaration object}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ObjectReference
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab IIR_SignalAttr
+@item @tab IIR_GenericArrayReference
+@item @tab IIR_RecordReference
+@item @tab IIR_AccessReference
+@item @tab IIR_SimpleReference
+@item Referenced by: @tab IIR_AssociationElement
+@item @tab IIR_ObjectDeclaration
+@item @tab IIR_DisconnectSpecification
+@item @tab IIR_SignalAttr
+@item @tab IIR_AttrSigFunc
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_OpenExpression
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Allocator
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Type type_mark}
+@item @tab @t{pIIR_Expression value}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_TypeConversion
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Type type_mark}
+@item @tab @t{pIIR_Expression expression}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_QualifiedExpression
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Type type_mark}
+@item @tab @t{pIIR_Expression expression}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_FunctionCall
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_FunctionDeclaration function}
+@item @tab @t{pIIR_AssociationList parameter_association_list}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArtificialArrayAggregate
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ArrayAggregate
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_IndexedAssociationList indexed_association_list}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArrayAggregate
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Aggregate
+@item Inherited by: @tab IIR_ArtificialArrayAggregate
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_IndexedAssociationList indexed_association_list}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArtificialRecordAggregate
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_RecordAggregate
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_ElementAssociationList element_association_list}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_RecordAggregate
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Aggregate
+@item Inherited by: @tab IIR_ArtificialRecordAggregate
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_ElementAssociationList element_association_list}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Aggregate
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab IIR_ArrayAggregate
+@item @tab IIR_RecordAggregate
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_NullExpression
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_EnumLiteralReference
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_EnumerationLiteral value}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArrayLiteralExpression
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_StringLiteral value}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PhysicalLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AbstractLiteralExpression
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_AbstractLiteral value}
+@item Direct slots: @tab @t{pIIR_PhysicalUnit unit}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AbstractLiteralExpression
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Expression
+@item Inherited by: @tab IIR_PhysicalLiteral
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_AbstractLiteral value}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Expression
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_ValueAttr
+@item @tab IIR_FunctionAttr
+@item @tab IIR_ObjectReference
+@item @tab IIR_OpenExpression
+@item @tab IIR_Allocator
+@item @tab IIR_TypeConversion
+@item @tab IIR_QualifiedExpression
+@item @tab IIR_FunctionCall
+@item @tab IIR_Aggregate
+@item @tab IIR_NullExpression
+@item @tab IIR_EnumLiteralReference
+@item @tab IIR_ArrayLiteralExpression
+@item @tab IIR_AbstractLiteralExpression
+@item Referenced by: @tab IIR_AssociationElement
+@item @tab IIR_ChoiceByExpression
+@item @tab IIR_WaveformElement
+@item @tab IIR_WaveformElement
+@item @tab IIR_ElementAssociation
+@item @tab IIR_IndexedAssociation
+@item @tab IIR_SingleIndexedAssociation
+@item @tab IIR_AttributeValue
+@item @tab IIR_ExpressionList
+@item @tab IIR_ExplicitRange
+@item @tab IIR_ExplicitRange
+@item @tab IIR_ArrayRange
+@item @tab IIR_ArrayRange
+@item @tab IIR_ObjectDeclaration
+@item @tab IIR_FileDeclaration
+@item @tab IIR_FileDeclaration
+@item @tab IIR_PhysicalUnit
+@item @tab IIR_DisconnectSpecification
+@item @tab IIR_QualifiedExpression
+@item @tab IIR_TypeConversion
+@item @tab IIR_Allocator
+@item @tab IIR_AccessReference
+@item @tab IIR_RecordReference
+@item @tab IIR_GenericArrayReference
+@item @tab IIR_Attr_DELAYED
+@item @tab IIR_Attr_STABLE
+@item @tab IIR_Attr_QUIET
+@item @tab IIR_AttrTypeValue
+@item @tab IIR_AttrTypeFunc
+@item @tab IIR_AttrArrayFunc
+@item @tab IIR_WaitStatement
+@item @tab IIR_WaitStatement
+@item @tab IIR_AssertionStatement
+@item @tab IIR_AssertionStatement
+@item @tab IIR_AssertionStatement
+@item @tab IIR_ReportStatement
+@item @tab IIR_ReportStatement
+@item @tab IIR_SignalAssignmentStatement
+@item @tab IIR_SignalAssignmentStatement
+@item @tab IIR_VariableAssignmentStatement
+@item @tab IIR_VariableAssignmentStatement
+@item @tab IIR_IfStatement
+@item @tab IIR_CaseStatement
+@item @tab IIR_WhileLoopStatement
+@item @tab IIR_LoopControlStatement
+@item @tab IIR_ReturnStatement
+@item @tab IIR_BlockStatement
+@item @tab IIR_ConcurrentGenerateIfStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Type subtype}
+@item @tab @t{IR_StaticLevel static_level}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_UseClause
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_Declaration used_unit}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_LibraryClause
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Label
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_SequentialStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_SequentialStatement statement}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_DisconnectSpecification
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_Type type_mark}
+@item @tab @t{pIIR_Expression time_expression}
+@item @tab @t{pIIR_ObjectReference guarded_signal}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConfigurationSpecification
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ConfigurationSpecificationList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Identifier label}
+@item @tab @t{pIIR_ComponentDeclaration component}
+@item @tab @t{pIIR_BindingIndication binding}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_BindingIndication
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ConfigurationSpecification
+@item @tab IIR_ComponentInstantiationStatement
+@item @tab IIR_ComponentInstantiationStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_DeclarativeRegion unit}
+@item @tab @t{pIIR_AssociationList generic_map_list}
+@item @tab @t{pIIR_AssociationList port_map_list}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PhysicalUnit
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_UnitList
+@item @tab IIR_PhysicalType
+@item @tab IIR_PhysicalUnit
+@item @tab IIR_PhysicalLiteral
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_Expression multiplier}
+@item @tab @t{pIIR_PhysicalUnit unit_name}
+@item @tab @t{pIIR_PhysicalType type}
+@item @tab @t{int unit_pos}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ComponentConfiguration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ConfigurationItem
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_LibraryUnit entity_aspect}
+@item @tab @t{pIIR_ComponentInstantiationList instantiation_list}
+@item @tab @t{pIIR_AssociationList generic_map_aspect}
+@item @tab @t{pIIR_AssociationList port_map_aspect}
+@item @tab @t{pIIR_BlockConfiguration block_config}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_BlockConfiguration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ConfigurationItem
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ConfigurationDeclaration
+@item @tab IIR_ComponentConfiguration
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_DeclarativeRegion block_specification}
+@item @tab @t{pIIR_DeclarationList use_clause_list}
+@item @tab @t{pIIR_ConfigurationItemList configuration_item_list}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConfigurationItem
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_DeclarativeRegion
+@item Inherited by: @tab IIR_ComponentConfiguration
+@item @tab IIR_BlockConfiguration
+@item Referenced by: @tab IIR_ConfigurationItemList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConfigurationDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LibraryUnit
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_DeclarationList context_items}
+@item @tab @t{pIIR_DeclarationList external_decls}
+@item @tab @t{pIIR_TextLiteral library_name}
+@item @tab @t{pIIR_LibraryUnitList used_units}
+@item Direct slots: @tab @t{pIIR_BlockConfiguration block_configuration}
+@item @tab @t{pIIR_EntityDeclaration entity}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PackageBodyDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LibraryUnit
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_DeclarationList context_items}
+@item @tab @t{pIIR_DeclarationList external_decls}
+@item @tab @t{pIIR_TextLiteral library_name}
+@item @tab @t{pIIR_LibraryUnitList used_units}
+@item Direct slots: @tab @t{pIIR_PackageDeclaration package}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PackageDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LibraryUnit
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_PackageBodyDeclaration
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_DeclarationList context_items}
+@item @tab @t{pIIR_DeclarationList external_decls}
+@item @tab @t{pIIR_TextLiteral library_name}
+@item @tab @t{pIIR_LibraryUnitList used_units}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArchitectureRef
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_DeclarativeRegion
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_EntityDeclaration entity}
+@item @tab @t{pIIR_TextLiteral architecture_name}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArchitectureDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LibraryUnit
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_DeclarationList context_items}
+@item @tab @t{pIIR_DeclarationList external_decls}
+@item @tab @t{pIIR_TextLiteral library_name}
+@item @tab @t{pIIR_LibraryUnitList used_units}
+@item Direct slots: @tab @t{pIIR_EntityDeclaration entity}
+@item @tab @t{pIIR_ConfigurationSpecificationList configuration_specifications}
+@item @tab @t{pIIR_ConcurrentStatementList architecture_statement_part}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_EntityDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_LibraryUnit
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ArchitectureDeclaration
+@item @tab IIR_ArchitectureRef
+@item @tab IIR_ConfigurationDeclaration
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_DeclarationList context_items}
+@item @tab @t{pIIR_DeclarationList external_decls}
+@item @tab @t{pIIR_TextLiteral library_name}
+@item @tab @t{pIIR_LibraryUnitList used_units}
+@item Direct slots: @tab @t{pIIR_InterfaceList generic_clause}
+@item @tab @t{pIIR_InterfaceList port_clause}
+@item @tab @t{pIIR_ConcurrentStatementList entity_statement_part}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_LibraryUnit
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_DeclarativeRegion
+@item Inherited by: @tab IIR_ConfigurationDeclaration
+@item @tab IIR_PackageBodyDeclaration
+@item @tab IIR_PackageDeclaration
+@item @tab IIR_ArchitectureDeclaration
+@item @tab IIR_EntityDeclaration
+@item Referenced by: @tab IIR_LibraryUnitList
+@item @tab IIR_ComponentConfiguration
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_DeclarationList context_items}
+@item @tab @t{pIIR_DeclarationList external_decls}
+@item @tab @t{pIIR_TextLiteral library_name}
+@item @tab @t{pIIR_LibraryUnitList used_units}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_LibraryDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_LibraryUnitList primary_units}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ComponentDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_DeclarativeRegion
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ConfigurationSpecification
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_InterfaceList local_generic_clause}
+@item @tab @t{pIIR_InterfaceList local_port_clause}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AttributeDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_AttributeValue
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_Type subtype}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_FileInterfaceDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_InterfaceDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item @tab @t{IR_Mode mode}
+@item @tab @t{bool bus}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SignalInterfaceDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_InterfaceDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item @tab @t{IR_Mode mode}
+@item @tab @t{bool bus}
+@item Direct slots: @tab @t{IR_SignalKind signal_kind}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_VariableInterfaceDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_InterfaceDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item @tab @t{IR_Mode mode}
+@item @tab @t{bool bus}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConstantInterfaceDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_InterfaceDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item @tab @t{IR_Mode mode}
+@item @tab @t{bool bus}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_InterfaceDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectDeclaration
+@item Inherited by: @tab IIR_FileInterfaceDeclaration
+@item @tab IIR_SignalInterfaceDeclaration
+@item @tab IIR_VariableInterfaceDeclaration
+@item @tab IIR_ConstantInterfaceDeclaration
+@item Referenced by: @tab IIR_AssociationElement
+@item @tab IIR_InterfaceList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item Direct slots: @tab @t{IR_Mode mode}
+@item @tab @t{bool bus}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_FileDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item Direct slots: @tab @t{pIIR_Expression file_open_expression}
+@item @tab @t{pIIR_Expression file_logical_name}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SignalDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item Direct slots: @tab @t{IR_SignalKind signal_kind}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SharedVariableDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_VariableDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_VariableDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectDeclaration
+@item Inherited by: @tab IIR_SharedVariableDeclaration
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConstantDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ObjectDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ForLoopStatement
+@item @tab IIR_ConcurrentGenerateForStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ObjectDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab IIR_InterfaceDeclaration
+@item @tab IIR_FileDeclaration
+@item @tab IIR_SignalDeclaration
+@item @tab IIR_VariableDeclaration
+@item @tab IIR_ConstantDeclaration
+@item Referenced by: @tab IIR_SimpleReference
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_Type subtype}
+@item @tab @t{pIIR_Expression initial_value}
+@item @tab @t{pIIR_ObjectReference alias_base}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SubtypeDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_TypeDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_Type type}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_TypeDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab IIR_SubtypeDeclaration
+@item Referenced by: @tab IIR_Type
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_Type type}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ElementDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ElementAssociation
+@item @tab IIR_ElementDeclarationList
+@item @tab IIR_RecordReference
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_Type subtype}
+@item @tab @t{int declaration_pos}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_EnumerationLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_EnumerationLiteralList
+@item @tab IIR_EnumLiteralReference
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_EnumerationType subtype}
+@item @tab @t{int enum_pos}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PredefinedFunctionDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_FunctionDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_InterfaceList interface_declarations}
+@item @tab @t{pIIR_SequentialStatementList subprogram_body}
+@item @tab @t{pIIR_SubprogramDeclaration prototype}
+@item @tab @t{bool pure}
+@item @tab @t{pIIR_Type return_type}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_FunctionDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SubprogramDeclaration
+@item Inherited by: @tab IIR_PredefinedFunctionDeclaration
+@item Referenced by: @tab IIR_Subtype
+@item @tab IIR_FunctionCall
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_InterfaceList interface_declarations}
+@item @tab @t{pIIR_SequentialStatementList subprogram_body}
+@item @tab @t{pIIR_SubprogramDeclaration prototype}
+@item Direct slots: @tab @t{bool pure}
+@item @tab @t{pIIR_Type return_type}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PredefinedProcedureDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ProcedureDeclaration
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_InterfaceList interface_declarations}
+@item @tab @t{pIIR_SequentialStatementList subprogram_body}
+@item @tab @t{pIIR_SubprogramDeclaration prototype}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ProcedureDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_SubprogramDeclaration
+@item Inherited by: @tab IIR_PredefinedProcedureDeclaration
+@item Referenced by: @tab IIR_ProcedureCallStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item @tab @t{pIIR_InterfaceList interface_declarations}
+@item @tab @t{pIIR_SequentialStatementList subprogram_body}
+@item @tab @t{pIIR_SubprogramDeclaration prototype}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SubprogramDeclaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_DeclarativeRegion
+@item Inherited by: @tab IIR_FunctionDeclaration
+@item @tab IIR_ProcedureDeclaration
+@item Referenced by: @tab IIR_SubprogramDeclaration
+@item @tab IIR_ReturnStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_InterfaceList interface_declarations}
+@item @tab @t{pIIR_SequentialStatementList subprogram_body}
+@item @tab @t{pIIR_SubprogramDeclaration prototype}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_LoopDeclarativeRegion
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_DeclarativeRegion
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_LoopStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@item Direct slots: @tab @t{pIIR_LoopStatement loop_statement}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_DeclarativeRegion
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Declaration
+@item Inherited by: @tab IIR_ConcurrentStatement
+@item @tab IIR_ConfigurationItem
+@item @tab IIR_ArchitectureRef
+@item @tab IIR_LibraryUnit
+@item @tab IIR_ComponentDeclaration
+@item @tab IIR_SubprogramDeclaration
+@item @tab IIR_LoopDeclarativeRegion
+@item Referenced by: @tab IIR_Declaration
+@item @tab IIR_DeclarativeRegion
+@item @tab IIR_BlockConfiguration
+@item @tab IIR_BindingIndication
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@item Direct slots: @tab @t{pIIR_DeclarativeRegion continued}
+@item @tab @t{pIIR_DeclarationList declarations}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Declaration
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_UseClause
+@item @tab IIR_LibraryClause
+@item @tab IIR_Label
+@item @tab IIR_DisconnectSpecification
+@item @tab IIR_PhysicalUnit
+@item @tab IIR_LibraryDeclaration
+@item @tab IIR_AttributeDeclaration
+@item @tab IIR_ObjectDeclaration
+@item @tab IIR_TypeDeclaration
+@item @tab IIR_ElementDeclaration
+@item @tab IIR_EnumerationLiteral
+@item @tab IIR_DeclarativeRegion
+@item Referenced by: @tab IIR_AssociationElement
+@item @tab IIR_AssociationElement
+@item @tab IIR_DeclarationList
+@item @tab IIR_UseClause
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_TextLiteral declarator}
+@item @tab @t{pIIR_DeclarativeRegion declarative_region}
+@item @tab @t{pIIR_AttributeValueList attributes}
+@item @tab @t{int seqno}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArraySubtype
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Subtype
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type immediate_base}
+@item @tab @t{pIIR_FunctionDeclaration resolution_function}
+@item Direct slots: @tab @t{pIIR_TypeList constraint}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArrayType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_CompositeType
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_TypeList index_types}
+@item @tab @t{pIIR_Type element_type}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_FileType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Type
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Type type_mark}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AccessType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Type
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Type designated_type}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_RecordSubtype
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Subtype
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type immediate_base}
+@item @tab @t{pIIR_FunctionDeclaration resolution_function}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_RecordType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_CompositeType
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_ElementDeclarationList element_declarations}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_CompositeType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Type
+@item Inherited by: @tab IIR_ArrayType
+@item @tab IIR_RecordType
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PhysicalType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ScalarType
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_PhysicalUnit
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_PhysicalUnit primary_unit}
+@item @tab @t{pIIR_UnitList units}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_FloatingType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ScalarType
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_IntegerType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ScalarType
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_EnumerationType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ScalarType
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_EnumerationLiteral
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_EnumerationLiteralList enumeration_literals}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ScalarSubtype
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Subtype
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item @tab @t{pIIR_Type immediate_base}
+@item @tab @t{pIIR_FunctionDeclaration resolution_function}
+@item Direct slots: @tab @t{pIIR_Range range}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ScalarType
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Type
+@item Inherited by: @tab IIR_PhysicalType
+@item @tab IIR_FloatingType
+@item @tab IIR_IntegerType
+@item @tab IIR_EnumerationType
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Subtype
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Type
+@item Inherited by: @tab IIR_ArraySubtype
+@item @tab IIR_RecordSubtype
+@item @tab IIR_ScalarSubtype
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@item Direct slots: @tab @t{pIIR_Type immediate_base}
+@item @tab @t{pIIR_FunctionDeclaration resolution_function}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Type
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_FileType
+@item @tab IIR_AccessType
+@item @tab IIR_CompositeType
+@item @tab IIR_ScalarType
+@item @tab IIR_Subtype
+@item Referenced by: @tab IIR_TypeList
+@item @tab IIR_ArrayRange
+@item @tab IIR_ArrayRange
+@item @tab IIR_Type
+@item @tab IIR_Subtype
+@item @tab IIR_AccessType
+@item @tab IIR_FileType
+@item @tab IIR_ArrayType
+@item @tab IIR_FunctionDeclaration
+@item @tab IIR_ElementDeclaration
+@item @tab IIR_TypeDeclaration
+@item @tab IIR_ObjectDeclaration
+@item @tab IIR_AttributeDeclaration
+@item @tab IIR_DisconnectSpecification
+@item @tab IIR_Expression
+@item @tab IIR_QualifiedExpression
+@item @tab IIR_TypeConversion
+@item @tab IIR_Allocator
+@item @tab IIR_AttrTypeValue
+@item @tab IIR_AttrTypeFunc
+@item @tab IIR_AttrArrayFunc
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_TypeDeclaration declaration}
+@item @tab @t{pIIR_Type base}
+@item @tab @t{IR_StaticLevel static_level}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ArrayREVERSE_RANGE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ArrayRange
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type type}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{pIIR_Expression index}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Attr_ArrayRANGE
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_ArrayRange
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Type type}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{pIIR_Expression index}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ArrayRange
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Range
+@item Inherited by: @tab IIR_Attr_ArrayREVERSE_RANGE
+@item @tab IIR_Attr_ArrayRANGE
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Type type}
+@item @tab @t{pIIR_Expression array}
+@item @tab @t{pIIR_Type array_type}
+@item @tab @t{pIIR_Expression index}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ExplicitRange
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Range
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Expression left}
+@item @tab @t{pIIR_Expression right}
+@item @tab @t{IR_Direction direction}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Range
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_ArrayRange
+@item @tab IIR_ExplicitRange
+@item Referenced by: @tab IIR_ChoiceByRange
+@item @tab IIR_RangeIndexedAssociation
+@item @tab IIR_ScalarSubtype
+@item @tab IIR_SliceReference
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_IdentifierList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_IdentifierList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Identifier first}
+@item @tab @t{pIIR_IdentifierList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConfigurationSpecificationList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ConfigurationSpecificationList
+@item @tab IIR_ArchitectureDeclaration
+@item @tab IIR_BlockStatement
+@item @tab IIR_ConcurrentGenerateStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_ConfigurationSpecification first}
+@item @tab @t{pIIR_ConfigurationSpecificationList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ComponentInstantiationList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ComponentInstantiationList
+@item @tab IIR_ComponentConfiguration
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_ComponentInstantiationStatement first}
+@item @tab @t{pIIR_ComponentInstantiationList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ElementAssociationList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ElementAssociationList
+@item @tab IIR_RecordAggregate
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_ElementAssociation first}
+@item @tab @t{pIIR_ElementAssociationList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_IndexedAssociationList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_IndexedAssociationList
+@item @tab IIR_ArrayAggregate
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_IndexedAssociation first}
+@item @tab @t{pIIR_IndexedAssociationList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ExpressionList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ExpressionList
+@item @tab IIR_ArrayReference
+@item @tab IIR_WaitStatement
+@item @tab IIR_SensitizedProcessStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Expression first}
+@item @tab @t{pIIR_ExpressionList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_TypeList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_TypeList
+@item @tab IIR_ArrayType
+@item @tab IIR_ArraySubtype
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Type first}
+@item @tab @t{pIIR_TypeList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_WaveformList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_WaveformList
+@item @tab IIR_SignalAssignmentStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_WaveformElement first}
+@item @tab @t{pIIR_WaveformList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_UnitList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_UnitList
+@item @tab IIR_PhysicalType
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_PhysicalUnit first}
+@item @tab @t{pIIR_UnitList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SequentialStatementList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_CaseStatementAlternative
+@item @tab IIR_SequentialStatementList
+@item @tab IIR_SubprogramDeclaration
+@item @tab IIR_IfStatement
+@item @tab IIR_IfStatement
+@item @tab IIR_LoopStatement
+@item @tab IIR_ProcessStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_SequentialStatement first}
+@item @tab @t{pIIR_SequentialStatementList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_LibraryUnitList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_LibraryUnitList
+@item @tab IIR_LibraryDeclaration
+@item @tab IIR_LibraryUnit
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_LibraryUnit first}
+@item @tab @t{pIIR_LibraryUnitList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_InterfaceList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_InterfaceList
+@item @tab IIR_SubprogramDeclaration
+@item @tab IIR_ComponentDeclaration
+@item @tab IIR_ComponentDeclaration
+@item @tab IIR_EntityDeclaration
+@item @tab IIR_EntityDeclaration
+@item @tab IIR_BlockStatement
+@item @tab IIR_BlockStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_InterfaceDeclaration first}
+@item @tab @t{pIIR_InterfaceList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_EnumerationLiteralList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_EnumerationLiteralList
+@item @tab IIR_EnumerationType
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_EnumerationLiteral first}
+@item @tab @t{pIIR_EnumerationLiteralList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_EntityClassEntryList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_EntityClassEntryList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_EntityClassEntry first}
+@item @tab @t{pIIR_EntityClassEntryList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ElementDeclarationList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ElementDeclarationList
+@item @tab IIR_RecordType
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_ElementDeclaration first}
+@item @tab @t{pIIR_ElementDeclarationList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_DeclarationList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_DeclarationList
+@item @tab IIR_DeclarativeRegion
+@item @tab IIR_LibraryUnit
+@item @tab IIR_LibraryUnit
+@item @tab IIR_BlockConfiguration
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Declaration first}
+@item @tab @t{pIIR_DeclarationList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConfigurationItemList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ConfigurationItemList
+@item @tab IIR_BlockConfiguration
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_ConfigurationItem first}
+@item @tab @t{pIIR_ConfigurationItemList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ConcurrentStatementList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ConcurrentStatementList
+@item @tab IIR_EntityDeclaration
+@item @tab IIR_ArchitectureDeclaration
+@item @tab IIR_BlockStatement
+@item @tab IIR_ConcurrentGenerateStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_ConcurrentStatement first}
+@item @tab @t{pIIR_ConcurrentStatementList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ChoiceList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_CaseStatementAlternative
+@item @tab IIR_ChoiceList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Choice first}
+@item @tab @t{pIIR_ChoiceList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_CaseStatementAlternativeList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_CaseStatementAlternativeList
+@item @tab IIR_CaseStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_CaseStatementAlternative first}
+@item @tab @t{pIIR_CaseStatementAlternativeList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AttributeValueList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_AttributeValueList
+@item @tab IIR_Declaration
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_AttributeValue first}
+@item @tab @t{pIIR_AttributeValueList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AssociationList
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_List
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_AssociationList
+@item @tab IIR_ComponentConfiguration
+@item @tab IIR_ComponentConfiguration
+@item @tab IIR_BindingIndication
+@item @tab IIR_BindingIndication
+@item @tab IIR_FunctionCall
+@item @tab IIR_ProcedureCallStatement
+@item @tab IIR_BlockStatement
+@item @tab IIR_BlockStatement
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_AssociationElement first}
+@item @tab @t{pIIR_AssociationList rest}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_List
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_IdentifierList
+@item @tab IIR_ConfigurationSpecificationList
+@item @tab IIR_ComponentInstantiationList
+@item @tab IIR_ElementAssociationList
+@item @tab IIR_IndexedAssociationList
+@item @tab IIR_ExpressionList
+@item @tab IIR_TypeList
+@item @tab IIR_WaveformList
+@item @tab IIR_UnitList
+@item @tab IIR_SequentialStatementList
+@item @tab IIR_LibraryUnitList
+@item @tab IIR_InterfaceList
+@item @tab IIR_EnumerationLiteralList
+@item @tab IIR_EntityClassEntryList
+@item @tab IIR_ElementDeclarationList
+@item @tab IIR_DeclarationList
+@item @tab IIR_ConfigurationItemList
+@item @tab IIR_ConcurrentStatementList
+@item @tab IIR_ChoiceList
+@item @tab IIR_CaseStatementAlternativeList
+@item @tab IIR_AttributeValueList
+@item @tab IIR_AssociationList
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AttributeValue
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_AttributeValueList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Expression value}
+@item @tab @t{pIIR_AttributeDeclaration attribute}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_OthersIndexedAssociation
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_IndexedAssociation
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Expression value}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SliceIndexedAssociation
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_RangeIndexedAssociation
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Expression value}
+@item @tab @t{pIIR_Range index_range}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_RangeIndexedAssociation
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_IndexedAssociation
+@item Inherited by: @tab IIR_SliceIndexedAssociation
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Expression value}
+@item Direct slots: @tab @t{pIIR_Range index_range}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_SingleIndexedAssociation
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_IndexedAssociation
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_Expression value}
+@item Direct slots: @tab @t{pIIR_Expression index}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_IndexedAssociation
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab IIR_OthersIndexedAssociation
+@item @tab IIR_RangeIndexedAssociation
+@item @tab IIR_SingleIndexedAssociation
+@item Referenced by: @tab IIR_IndexedAssociationList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Expression value}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ElementAssociation
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ElementAssociationList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_ElementDeclaration element}
+@item @tab @t{pIIR_Expression value}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_WaveformElement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_WaveformList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Expression value}
+@item @tab @t{pIIR_Expression time}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_EntityClassEntry
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_EntityClassEntryList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{IR_Kind entity_kind}
+@item @tab @t{bool is_boxed}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ChoiceByOthers
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Choice
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ChoiceByRange
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Choice
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Range range}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_ChoiceByExpression
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Choice
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_Expression value}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Choice
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab IIR_ChoiceByOthers
+@item @tab IIR_ChoiceByRange
+@item @tab IIR_ChoiceByExpression
+@item Referenced by: @tab IIR_ChoiceList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_CaseStatementAlternative
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_CaseStatementAlternativeList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_SequentialStatementList sequence_of_statements}
+@item @tab @t{pIIR_ChoiceList choices}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AssociationElementOpen
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AssociationElement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_ObjectReference formal}
+@item @tab @t{pIIR_InterfaceDeclaration formal_declaration}
+@item @tab @t{pIIR_Declaration formal_conversion}
+@item @tab @t{pIIR_Expression actual}
+@item @tab @t{pIIR_Declaration actual_conversion}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AssociationElementByExpression
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AssociationElement
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{pIIR_ObjectReference formal}
+@item @tab @t{pIIR_InterfaceDeclaration formal_declaration}
+@item @tab @t{pIIR_Declaration formal_conversion}
+@item @tab @t{pIIR_Expression actual}
+@item @tab @t{pIIR_Declaration actual_conversion}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AssociationElement
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Tuple
+@item Inherited by: @tab IIR_AssociationElementOpen
+@item @tab IIR_AssociationElementByExpression
+@item Referenced by: @tab IIR_AssociationList
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{pIIR_ObjectReference formal}
+@item @tab @t{pIIR_InterfaceDeclaration formal_declaration}
+@item @tab @t{pIIR_Declaration formal_conversion}
+@item @tab @t{pIIR_Expression actual}
+@item @tab @t{pIIR_Declaration actual_conversion}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Tuple
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_ConfigurationSpecification
+@item @tab IIR_BindingIndication
+@item @tab IIR_AttributeValue
+@item @tab IIR_IndexedAssociation
+@item @tab IIR_ElementAssociation
+@item @tab IIR_WaveformElement
+@item @tab IIR_EntityClassEntry
+@item @tab IIR_Choice
+@item @tab IIR_CaseStatementAlternative
+@item @tab IIR_AssociationElement
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_FloatingPointLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AbstractLiteral
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{IR_String text}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_IntegerLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_AbstractLiteral
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{IR_String text}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_AbstractLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Literal
+@item Inherited by: @tab IIR_FloatingPointLiteral
+@item @tab IIR_IntegerLiteral
+@item Referenced by: @tab IIR_AbstractLiteralExpression
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_StringLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_TextLiteral
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_ArrayLiteralExpression
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{IR_String text}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_CharacterLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_TextLiteral
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{IR_String text}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Identifier
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_TextLiteral
+@item Inherited by: @tab none
+@item Referenced by: @tab IIR_IdentifierList
+@item @tab IIR_ConfigurationSpecification
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item @tab @t{IR_String text}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_TextLiteral
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Literal
+@item Inherited by: @tab IIR_StringLiteral
+@item @tab IIR_CharacterLiteral
+@item @tab IIR_Identifier
+@item Referenced by: @tab IIR_Declaration
+@item @tab IIR_LibraryUnit
+@item @tab IIR_ArchitectureRef
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab @t{IR_String text}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Literal
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_AbstractLiteral
+@item @tab IIR_TextLiteral
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Signature
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Dummy
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Dummy
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_Root
+@item Inherited by: @tab IIR_Signature
+@item Referenced by: @tab none
+@item Inherited slots: @tab @t{pIIR_PosInfo pos}
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_Root
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab tree_base_node
+@item Inherited by: @tab IIR_SequentialStatement
+@item @tab IIR_Expression
+@item @tab IIR_Declaration
+@item @tab IIR_Type
+@item @tab IIR_Range
+@item @tab IIR_List
+@item @tab IIR_Tuple
+@item @tab IIR_Literal
+@item @tab IIR_Dummy
+@item Referenced by: @tab none
+@item Inherited slots: @tab none
+@item Direct slots: @tab @t{pIIR_PosInfo pos}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PosInfo_Sheet
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_PosInfo
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab none
+@item Direct slots: @tab @t{const char* sheet_name}
+@item @tab @t{int x_coordinate}
+@item @tab @t{int y_coordinate}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PosInfo_TextFile
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab IIR_PosInfo
+@item Inherited by: @tab none
+@item Referenced by: @tab none
+@item Inherited slots: @tab none
+@item Direct slots: @tab @t{const char* file_name}
+@item @tab @t{int line_number}
+@end multitable
+
+@end deftp
+
+@deftp Node IIR_PosInfo
+@multitable {Inherited slots:} {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+@item Inherits from: @tab tree_base_node
+@item Inherited by: @tab IIR_PosInfo_Sheet
+@item @tab IIR_PosInfo_TextFile
+@item Referenced by: @tab IIR_Root
+@item Inherited slots: @tab none
+@item Direct slots: @tab none
+@end multitable
+
+@end deftp
+
+
+@contents
+
+@bye
+
+@c
+@c 

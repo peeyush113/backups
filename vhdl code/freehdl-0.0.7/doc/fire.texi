@@ -1,0 +1,1300 @@
+\input texinfo      @c -*- texinfo -*-
+@c %**start of header
+@setfilename fire.info
+@settitle FIRE Reference Manual
+@setchapternewpage odd
+@dircategory Programming
+@direntry
+* FIRE: (fire).                The FIRE Reference Manual.
+@end direntry
+@c %**end of header
+
+@titlepage
+@title The FIRE Reference Manual
+@subtitle draft for VAUL version 0.7
+@author Marius Vollmer
+
+@page
+@vskip 0pt plus 1filll
+Copyright @copyright{} 1998, 1999 Marius Vollmer.
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation.  A copy
+of the license is included in the section entitled "GNU Free
+Documentation License".
+@end titlepage
+
+@ifinfo
+@node Top
+@top The libfire library
+
+The libfire library provides @dfn{FIRE}, the Feeble Intermediate
+Representation with Extensibility.
+
+@end ifinfo
+
+@menu
+* Introduction::                
+* Using gen-nodes::             
+* Using the Generated Code::    
+* FIRE Reference::              
+@end menu
+
+@node Introduction
+@chapter Introduction
+
+This library provides @dfn{FIRE}, the Feeble Intermediate Representation
+with Extensibility.
+
+Additionally, it provides general support for working with @dfn{abstract
+syntax trees}.  It implements a precise view of what such an abstract
+syntax tree really is and it has facilities for dealing with it
+efficiently.
+
+Abstract syntax trees are often used as an intermediate representation
+in compilers or other language processing tools.  They are built while
+analyzing the original source text and have the same meaning as the
+source text, but in a form that is more suited to be dealt with by
+programs.
+
+When you are working with the raw source of a program you have to deal
+with such `unimportant' issues as where an identifier starts in the file
+and where it ends, whether there are parentheses around this expression,
+or to which declaration an identifier really refers.  Syntax trees are
+used to `abstract away' most of this issues.
+
+The libfire library is written in C++.  That means that you can probably
+only use it from C++.  It should not be overly difficult to also provide
+a C interface to FIRE, so if you want it, be sure to tell
+me@footnote{@email{mvo@@zagadka.ping.de}}.
+
+For the rest of this chapter, we will develop a more or less complete
+example of a simple abstract syntax tree.  If you already have a general
+idea of what such a thing is, you might still want to read it, as it
+also introduces such things a @dfn{double dispatch} and @dfn{generic
+functions}, plus some motivation for them.
+
+The @samp{gen-nodes} tool builts on the principles outlined in the
+example, and in turn, FIRE builds on @samp{gen-nodes}.
+
+For the example, suppose you want to write a little program that can
+compute the derivative of simple arithmetic expressions.  A typical use
+of the program might look like this:
+
+@example
+2*x+3
+@result{} 2
+@end example
+
+Here the user types the expression @samp{2*x+3} and the program answeres
+@samp{2}, which is the derivative of @samp{2*x+3} with respect to
+@samp{x}.
+
+@menu
+* Types::                       
+* Operations::                  
+* Extending::                   
+* New Types::                   
+@end menu
+
+@node Types
+@section The Data Types
+
+Because the program wants to work on the expressions in a convenient
+way, we have to transform the input--which simply consists of a sequence
+of characters--into an internal, intermediate form.  To do this, we
+define a data structure for every kind of thing that can appear in the
+input.  To keep things simple, we restrict us here to: constants,
+variables and binary operations@footnote{@emph{Binary} here means `with
+two operands', not `operating on bits'}.  Here are the data structures,
+in all their glory.  They are somewhat circular, so it's probably best
+to show them all at once; explanations are below.
+
+@example
+struct expression @{
+@};
+
+struct constant : expression @{
+  double value;
+
+  constant (double value)
+   : value (value)
+  @{ @}
+@};
+
+struct variable : expression @{
+  char *id;
+
+  variable (char *id)
+   : id (id)
+  @{ @}
+@};
+
+struct binop : expression @{
+  char op;
+  expression *left;
+  expression *right;
+
+  binop (char op, expression *left, expression *right)
+   : op (op),
+     left (left),
+     right (right)
+  @{ @}
+@};
+@end example
+
+As you can see, there is some redundancy in the code.  We have only four
+data structures here, but the real FIRE contains some 200 of them and we
+will encounter more cases of `boilerplate' code in the course of this
+example.  Not all is lost, tho.  As will later be explained, there are
+mechanisms in place that help you generate much of this code
+automatically from a higher level description.
+
+We use inheritance to express the relations between the structures.  The
+three `interesting' structures are derived from a common base type,
+@code{expression}.  This allows us to treat all three structure types
+the same when we don't know or care what specific type really is at
+hand.  For example, the @code{binop} structure contains pointers to
+structures that represent the left and right operands, respectively.
+All we can say about these operands is that they are expressions, we
+don't know beforehand whether they are constants, variables or another
+binary operation.  Consequently, all we can do in the @code{binop}
+structure is to declare pointers to the common base class
+@code{expression}.
+
+Returning to the example expression from above, how would we represent
+@samp{2*x+3} with these data structures?  The following piece of code
+would construct a suitable net of objects.
+
+@example
+expression *
+build_sample_expression ()
+@{
+  return new binop ('+', 
+                    new binop ('*',
+                               new constant (2),
+                               new variable ("x")),
+                    new constant (3));
+@}
+@end example
+
+Note how the explicit nesting of the @code{new} expressions reflects the
+implicit nesting in the original expression.  In effect, the precedence
+rules of arithmetic expressions (multiply before add) have been
+abstracted out.  We no longer need to know these rules to decide how to
+pair sub-expressions because the pointers of the @code{binop} structure
+tell the story very clearly.
+
+Of course, the resulting data structure is some kind of @emph{tree},
+which represents information that were originally contained in some form
+of @emph{syntax}, and some details of this syntax have been
+@emph{abstracted} away.  That's why they are called @emph{abstract
+syntax trees}.
+
+The individual data objects (instances of the structure types) that form
+such a tree are called its @dfn{nodes}.  To distinguish the structure
+types of these node objects from other types that are not directly
+related to the syntax tree data structure, we will call them @dfn{node
+types} in the following.  Thus, @code{expression}, @code{constant},
+@code{variable} and @code{binop} are node types, while the thing
+returned by @code{build_sample_expression} is a node (that has pointers
+to other nodes).  While we are at it, the precise type of a node is
+often called its @dfn{kind}.  Thus, the kind of the node returned by
+@code{build_sample_expression} is @code{binop}.
+
+Now that the intermediate representation for our program is sufficiently
+defined, we need a way to get from the textual input to an equivalent
+abstract syntax tree.  This is the job of the @dfn{parser}.  The parser
+is responsible for taking the input apart, deciding which part of it
+means what, and putting together a corresponding abstract syntax tree.
+The process of doing so is full of difficult decisions that require a
+carefully crafted set of rules (the grammar) and some serious looking
+around in the input text.  Even for such simple things as arithmetic
+expressions, writing a parser makes the need for a sufficiently abstract
+data structure clear.  You will only want to write the parser once, all
+other parts of the program are better off working with the abstract
+syntax tree.
+
+We wont show the parser here, because it would probably be too
+complicated and give too little insight into the topic of this manual.
+In fact, libfire itself does not contain a parser for turning VHDL into
+FIRE.  This is the job of another, altogether much more complicated
+library.
+
+@node Operations
+@section Performing Opertions on the Types
+
+Instead of looking at parsing techniques, let's see how we can work with
+an existing tree.  Our simple derivation program will want to output
+arbitrary expressions.  Naturally these expressions will be computed
+from the input expressions, by use of the node types above.  So we need
+a way to turn an abstract syntax tree back into it's textual form.  This
+is much simpler than the other way round.
+
+We need to do different things depending on the kind of the node that we
+want to output.  The vehicle of choice for doing this run-time type
+dispatch in C++ is the virtul function, of course.  So let's add one to
+our node type definitions.
+
+@example
+#include <iostream.h>
+
+struct expression @{
+  ...
+  virtual ostream& operator<< (ostream& o) = 0;
+@};
+
+struct constant : expression @{
+  ...
+  virtual ostream& operator<< (ostream& o)
+  @{
+    return o << value;
+  @}    
+@};
+
+struct variable : expression @{
+  ...
+  virtual ostream& operator<< (ostream& o)
+  @{
+    return o << id;
+  @}
+@};
+
+struct binop : expression @{
+  ...
+  virtual ostream& operator<< (ostream& o)
+  @{
+    return o << "(" << left << op << right << ")";
+  @}
+@};
+@end example
+
+Unfortunately, using virtual functions in a straightforward way results
+in a lot of accumulated `cruft' in the structure definitions.  For each
+new operation that we want to define, we have to modify the definitions
+of the node types.  This might be acceptable for a small, monolithic
+application, but it does not work for a library of predefined node types
+like libfire.  We would have to anticipate all possible virtual
+functions that all users of the library might want to have.
+
+But the number of useful operations that can be performed on a data
+structure is effectively unlimited.  It would be nice to somehow
+decouple the virtual functions that are used to implement the operations
+from the definition of the data structures that they work on.
+
+There is a well known trick to achieve this: @dfn{double dispatch}, also
+known as the Visitor pattern.
+
+Instead of adding a new virtual function to the node types for every
+operation that wants to do run-time dispatching, we try to add only a
+single, generic one that we can then reuse.
+
+Here is all the code needed to implement this idea.  The details from
+the previous section have been omitted for clarity.
+
+@example
+struct constant;
+struct variable;
+struct binop;
+
+struct visitor @{
+  void visit_constant (constant *c) = 0;
+  void visit_variable (variable *v) = 0;
+  void visit_binop (binop *b) = 0;
+@};
+
+struct expression @{
+  ...
+  virtual void dispatch (visitor *v) = 0;
+@};
+
+
+struct constant : expression @{
+  ...
+  virtual void dispatch (visitor *v)
+  @{
+    v->visit_constant (this);
+  @}
+@};
+
+struct variable : expression @{
+  ...
+  virtual void dispatch (visitor *v)
+  @{
+    v->visit_variable (this);
+  @}
+@};
+
+struct binop : expression @{
+  ...
+  virtual void dispatch (visitor *v)
+  @{
+    v->visit_binop (this);
+  @}
+@};
+@end example
+
+Now, when we want to implement a new function that has to do different
+things depending on the type of some node, we can just use the
+@code{visitor} class as an trampoline.  We derive a new class from
+@code{visitor} and then invoke the @code{dispatch} member function of
+the node we want to dispatch on with an instance of our new class.
+
+For example, the printing routine could be implemented thusly:
+
+@example
+ostream& operator<< (ostream&, expression *e);
+
+struct print_visitor : visitor @{
+  ostream &o;
+  ostream &result;
+
+  void visit_constant (constant *c)
+  @{
+    result = o << c->value;
+  @}
+
+  void visit_variable (variable *v)
+  @{
+    result = o << v->variable;
+  @}
+
+  void visit_binop (binop *b)
+  @{
+    result = o << "(" << b-left << b->op << b->right << ")";
+  @}
+@};
+
+ostream&
+operator<< (ostream &o, expression *e)
+@{
+  print_visitor v;
+  v.o = o;
+  e->dispatch (&v);
+  return v.result;
+@}
+@end example
+
+This does what we want, but something is still missing.  First, the need
+to marshall the arguments and the return value of the function thru the
+@code{print_visitor} class is awkward.  But it is the best we can do,
+since we have to tunnel the flow of control thru the @code{dispatch} and
+@code{visit_*} functions.
+
+This is another case of `boilerplate' code.  To enable it to be
+automatically generated, we separate the pieces that must be written by
+us humans from the pieces that can readily be generated.
+
+For the @code{print_visitor} from above, the hand written code consists
+only of the bodies of the @code{visit_*} functions.  We cn separate the
+code as follows:
+
+@example
+// hand written
+
+ostream &operator<< (ostream &o, expression *e)
+@{
+  return print (e, o);
+@}
+
+ostream &m_print (constant *c, ostream &o)
+@{
+  return o << c->value;
+@}
+
+ostream &m_print (variable *v, ostream &o)
+@{
+  return o << v->variable;
+@}
+
+ostream &m_print (binop *b, ostream &o)
+@{
+  return o << "(" << b-left << b->op << b->right << ")";
+@}
+
+// automatically generated
+
+struct print_visitor : visitor @{
+  ostream &o;
+  ostream &result;
+
+  void visit_constant (constant *c)
+  @{
+    result = m_print (c, o);
+  @}
+
+  void visit_variable (variable *v)
+  @{
+    result = m_print (v, o);
+  @}
+
+  void visit_binop (binop *b)
+  @{
+    result = m_print (b, o);
+  @}
+@};
+
+ostream&
+print (expression *e, ostream &o)
+@{
+  print_visitor v;
+  v.o = o;
+  e->dispatch (&v);
+  return v.result;
+@}
+@end example
+
+Now, this looks much better.  What we have now are essentially virtual
+functions that are @emph{not} members of the class that they are defined
+for.  This is much like the thing that Common Lisp calls @dfn{generic
+functions}, so we call our imitation the same.  The function
+@code{print} in the example above is such a generic function.  The
+individual functions that implement the desired functionality for every
+node type are called @dfn{methods} of a generic function.  The set of
+functions named @code{m_print} are the methods of the generic function
+@code{print}.
+
+@node Extending
+@section Extending the Node Types
+
+It is often convenient to store random things about a syntax tree while
+working with it.  Often these additional information are associated with
+a particular node and should be easy to retrieve given that node.
+
+Suppose the derivation routine in our example program works in two
+passes.  The first pass goes over the whole expression and determines
+which parts of it are constant; the second pass then uses this
+information to make some shortcuts.  It would be most convenient if each
+node type had an additional field @code{is_constant} that carried the
+information about constness of the expression originating at that node.
+But we haven't thought about this in advance and we don't want to change
+the node type definitions everytime someone wants to stick some private
+information to the nodes.
+
+This is analogous to the previous section.  We can't modify the node
+type definitions specifically for each user of libfire, so we have to
+find a generic way to dynamically attach data to nodes.
+
+We could use a hash table that is indexed with the nodes for each
+individual piece of data that we want to attach.  But there is a better
+way.  Each node object gets to carry a list of @dfn{properties}.  A
+property is a key/value pair, where the key is a small integer and the
+value is a @code{void} pointer.  The base node has @code{put} and
+@code{get} functions to set and retrieve these properties.
+Additionally, there is a function that returns unique keys.
+
+@example
+int get_unique_key ();
+
+struct expression @{
+  ...
+  void  put (int key, void *value);
+  void *get (int key);
+@};
+@end example
+
+Now, each piece of code can request its own individual key and use it to
+hand arbitrary structures to the nodes. Like this
+
+@example
+struct deriver_info @{
+  bool is_const;
+@};
+
+deriver_info *
+get_deriver_info (expression *e) const
+@{
+  static int deriver_key = get_unique_key ();
+
+  deriver_info *d = (deriver_info *) e->get(deriver_key);
+  if (d == NULL)
+    @{
+      d = new deriver_info;
+      d->is_const = false;
+      e->put (deriver_key, d);
+    @}
+  return d;
+@}
+
+// to make things more convenient
+
+inline bool&
+is_const (expression *e)
+@{
+  return get_deriver_info(e)->is_const;
+@}
+
+  ...
+  is_const (e) = true;
+  ...
+  if (is_const (e))
+    @{
+      ...
+    @}
+@end example
+
+As usual, we spot some boilerplate code here that could be automatically
+generated to make this maximally convenient.  The @code{gen-nodes} tool
+explained in the next chapter can do this, too.
+
+@node New Types
+@section Defining new Node Types
+
+We now have some methods for defining some kind of virtual functions on
+the node types and decorating the tree with arbitrary data, all without
+having to change the node type definitions themselves.  This is great.
+But what about defining completely new node types?  The method for
+attaching data to the nodes from the previous section clearly has no
+problem with that.  As long as the new node types are derived from the
+common base of all node types, everything is fine.
+
+It is not so easy with the Visitor pattern.  The base class of all
+visitors has to know about all node types that are there because it has
+to provide a @code{visit} function for each of them.  It looks like we
+need some coordination between the individual modules that want to
+define new node types.
+
+Fortunately, this coordination can be automated and the @code{gen-nodes}
+tool can handle this situation just fine.
+
+@node Using gen-nodes
+@chapter Using @code{gen-nodes}
+
+As hinted at in the introduction, much of the code that is needed to
+implement useful node types can be automatically generated from a
+condensed, @emph{high level} description of the desired features.
+
+The tool @code{gen-nodes} can read such a description and crank out the
+corresponding C++ code.  The input to @code{gen-nodes} is essentially
+written in a custom programming language that has been specifically
+invented for this purpose.
+
+So you have to learn a new programming language just to use libfire?
+Almost.  First, you only need to know this new language when you are
+actually working on the high level descriptions, of course.  When you
+are only accessing the ready made node types from C++, you can maybe get
+away without ever looking at such a high level description.
+
+Second, this new language is actually quite simple.  I'm tempted to say
+that it is simpler to learn it than to learn all the rules about
+hand-writing the node type definitions.  Anyway, even if you do not
+immediatly plan to hack the high level description you should quickly
+browse thru this chapter to get an idea what @code{gen-nodes} is all
+about.  It should be fairly easy to pick up enough to make some sense
+out of the description files (for first hand fact about FIRE) even if
+you don't internalize enough to write them yourself.
+
+@menu
+* Chunks::                      
+* Invoking gen-nodes::          
+* Descriptions::                
+@end menu
+
+@node Chunks
+@section Chunks
+
+A central concept for the high level description of the features of the
+abstract syntax graph is the @dfn{chunk}.  The complete description is
+coarsly divided into chunks with the guarantee that the C++ code
+generated for one chunk is as independent from the code generated for
+other chunks as it can be.
+
+This is intented to facilitate the link-time composition and
+coordination of independent modules.  For example, the libfire library
+defines a chunk named @samp{fire} that contains all its ready made
+node types and assorted generic functions.  The libvaul library, which
+uses libfire, defines its own chunk named @samp{vaul} that contains all
+its private extensions.  The @samp{fire} chunk is completely independent
+from the @samp{vaul} chunk.  Changing the @samp{vaul} chunk does in no
+way influence the compiled and installed libfire or any other libraries
+and applications that do not use libvaul.
+
+This might sound like a trivial thing, and indeed it is just what we
+expect from a system of independent modules.  But C++ does not make it
+particular easy to achieve all the goodies that we want from the node
+types without introducing unwanted dependencies between logically
+independent modules.  We have to use some non-trivial implementation
+tricks for avoiding these unwanted dependencies.
+
+The chunks are used to specify which parts should be decoupled and
+conversely, for which parts @code{gen-nodes} is allowed to forget about
+independence and go for a more efficient implementation instead.
+
+The net result is that two files are generated for each chunk: one C++
+header file and one C++ file with the implementation.  Whenever you
+change a chunk, these two files need to be regenerated and consequently
+all components of your program that use these files need to be
+recompiled or relinked.  The point of @code{gen-nodes} is allow you
+extend and augment the definitions in one chunk without actually
+changing that chunk.
+
+@node Invoking gen-nodes
+@section Invoking @code{gen-nodes}
+
+When the preprocessor @code{gen-nodes} is called as
+
+@example
+gen-nodes @var{cmd} @var{chunk} @var{in-file} @var{out-file}
+@end example
+
+it will read in a file named @var{in-file} that contains the high-level
+description and generate from it the file called @var{out-file},
+according to @var{cmd} and @var{chunk}.  The file @var{out-file} will
+contain the code for the chunk named @var{chunk}, which must be defined
+somewhere in @var{in-file}.  When @var{cmd} is equal to @code{header},
+@var{out-file} will be a C++ header file; when @var{cmd} is equal to
+@code{impl}, it will the C++ implementation file.
+
+Suppose you have a file called @file{fire-chunk.t} that defines a chunk
+named @code{fire}.  Then you can generate the C++ files
+@file{fire-chunk.h} and @file{fire-chunk.cc} from it with these two
+invokations of @code{gen-nodes}:
+
+@example
+gen-nodes header fire fire-chunk.t fire-chunk.h
+gen-nodes impl   fire fire-chunk.t fire-chunk.cc
+@end example
+
+The program @code{gen-nodes} has some other features are not explained
+here.
+
+@node Descriptions
+@section The Description File
+
+The @var{IN-FILE} mentioned above is written in a custom language.  This
+section describes that language.  Along with it, it also describes the
+underlying concepts and the intended use of the features.
+
+@menu
+* General Syntax::              
+* Options::                     
+* Toplevel Definitions::        
+* Defining Primitive Types::    
+* Defining Nodes::              
+* Defining Generic Functions::  
+* Defining Node Extensions::    
+* Defining Creators::           
+* Defining Unions::             
+@end menu
+
+@node General Syntax
+@subsection General syntax
+
+The syntactic structure of the description language is that of LISP.
+That is, it is a fully parenthesized prefix notation.  The statements of
+the language are made up of lists and that lists consists of other
+nested lists or atoms.  A atom is everything that is not a list:
+numbers, identifiers (also called symbols), strings and some other
+things.  A list starts with a @code{(}, contains zero or more whitespace
+separated elements, and ends with a @code{)}.  For example, the
+following is a typical statement:
+
+@example
+(defnode variable (expression)
+  ((char* id)))
+@end example
+
+This statement is one list whose first element is the symbol
+@code{defnode}.  This symbol is the keyword of the statement and
+determines how the rest of the list is interpreted.  The general
+structure of such a @code{defnode} statement would be defined in this
+manual like this:
+
+@defmac defnode name (base ...) (slot ...) option ...
+@end defmac
+
+with explainations what @var{name}, @var{base}, etc means.  The ellipsis
+@samp{...} denotes that zero or more instances of the preceding element
+may be present.  For example, the first sublist in the @code{defnode}
+form above is allowed to contain any number of @var{base} elements.
+
+Symbols can contain extended characters in addition to the ususal
+alpha-numeric ones and the underscore.  The following characters are
+also valid in symbols:
+
+@example
+     + - . * / < = > ! ? : $ % _ & ~ ^
+@end example
+
+But note that most symbols are copied verbatim into the generated C++
+code and so you must make sure that they are also valid C++ identifiers.
+
+Strings are a sequence of arbitary characters enclosed in double quotes
+@code{"}.  The backslash @code{\\} can be used as an escape character.
+
+For the full story, refer to the definition of the programming language
+Scheme.
+
+If you are already familiar with Scheme, it might be interesting for you
+to know that the description files are in fact executed as Scheme code.
+The special statements that are explained in the sequel are actually
+Scheme macros that are defined while the description file is executed.
+However, what you can precisely do within the description files is
+currently defined by the implementation of @code{gen-nodes}, which uses
+GNU Guile as its Scheme interpreter.  Time will tell whether we need a
+more precise definition of the contents of the description files.  For
+now, please read the existing description files or the source code of
+@code{gen-nodes} to find out what you can do.
+
+@node Options
+@subsection Options
+
+Many of the statements defined below accept a list of options.  These
+options follow a common syntax and are used to have a way to easily and
+robustly extend the statements with random features.  An option is a
+key/value pair and every statement that takes options defines what keys
+are valid for it and what the value means.
+
+Syntactically, an option is a list whose first element is a symbol (the
+key of the option) and the rest are arbitrary elements (the value for
+the key).  For example
+
+@example
+(cname "int")
+@end example
+
+@noindent is an option with key @code{cname} and value @code{"int"}.
+
+Options can have more than value: @code{(cname "int" xyzzy)} would be
+just as valid.  It depends on the individual option whether these
+additional values are simply ignored or whether they have a menaing.
+
+@node Toplevel Definitions
+@subsection Toplevel Definitions
+
+You can include the text of additional files into your description by
+using the @code{include} statement.
+
+@defmac include file
+Read and interpret the contents of @var{file}.  This can be used when
+you want to use node types from other chunks in the following code.
+@end defmac
+
+A chunk is started by the @code{chunk} statement and continues until the
+next chunk is started or the description file ends.
+
+@defmac chunk name option ...
+Start the chunk named @var{name} (a symbol).  The following options are
+defined for chunks, they all take one value:
+
+@table @samp
+@item struct-fmt @var{string}
+@itemx struct-fmt-func @var{function}
+These two options can be used to control the way node type names are
+translated into C++ struct names.  @code{struct-fmt} defines the format
+string used when emitting such a structure name.  It should contain
+exactly one instance of @code{"~a"}, which will be replaced with the
+name of the node type.  Defaults to "s~a".
+
+@code{struct-fmt-func} can be used to specify a function that constructs
+the C++ struct name from a symbol.  It takes precedence over
+@code{struct-fmt}.
+
+@item pointer-fmt @var{string}
+@itemx pointer-fmt-func @var{function}
+Like @code{struct-fmt} but for the C++ names of the types that are
+pointers to the node type structs.  Defaults to @code{"n~a"}.
+@item kind-fmt @var{string}
+@itemx kind-fmt-func @var{function}
+Like @code{struct-fmt} but for the names of the C++ name of the kind
+identifier of a node type.  Defaults to @code{"nk~a"}.
+@item creater-fmt @var{string}
+@itemx creater-fmt-func @var{function}
+Like @code{struct-fmt} but for the names of creator functions for a
+certain node type.  Defaults to @code{"m~a"}.
+@item default-base @var{symbol}
+The C++ name of the struct that will be used when a @code{defnode}
+statement does not specify a base type.  Defaults to
+@code{tree_base_node}.
+@end table
+
+It is necessary to put additional lines at the top of the generated C++
+files to set up the context in that there are compiled.  You can use the
+following two statements for this.
+
+@defmac header-add string ...
+Each @var{string} is copied verbatim to the start of the generated
+header file.
+@end defmac
+
+@defmac impl-add string ...
+Like @code{header-add} but for the C++ implementation file.
+@end defmac
+
+The generated files do not contain any @code{#include} directives on
+their own.  However, they expect that the header files for the run-time
+support machinery have been included.  You have to arrange for that
+yourself, typically by adding a line like
+
+@example
+#include <tree-supp.h>
+@end example
+
+in the header file and then includung the generated header file in the
+implementation file.
+
+@end defmac
+
+@node Defining Primitive Types
+@subsection Defining Primitive Types
+
+In addition to links to other nodes, a node can also contain slots of
+arbitary C++ types.  Each of the C++ types that you want to use for such
+payloads needs to be defined with the @code{defctype} statement.
+
+@defmac defctype name option ...
+Define a new primitive type named @var{name}.  The following options are
+available:
+
+@table @samp
+@item cname @var{string}
+The string used in the generated C++ code to refer to this type.
+Defaults to the name of the primitive type.
+@end table
+
+@end defmac
+
+@node Defining Nodes
+@subsection Defining Nodes
+
+@defmac defnode name bases (slot ...) option ...
+Define a new node type named @var{name}.  It's inheritance is determined
+by @var{bases}.  When @var{bases} is the empty list @code{()} the new
+node type derives from the default base as determined by the chunk
+options.  Otherwise, @var{bases} must contains exactly one symbol which
+is the name of a previously defined node type.  The new node type
+inherits all slots from its base type.
+
+A @var{slot} defines one data member of the node type.  The syntax of a
+slot definition is
+
+@example
+(@var{type} @var{name} @var{option} ...)
+@end example
+
+where @var{name} (a symbol) is the name of the slot and @var{type} is
+either a name defined by @code{defnode} or a name defined
+by@code{defctype}.  When the type has been defined by @code{defnode} the
+slot is called a @dfn{reference} slot and can be used to point to a node
+of that type or that is derived from it.  When the type has been
+definied by @code{defctype}, the slot is called a @dfn{payload} slot.
+Node slots take the following option:
+
+@table @samp
+@item init-filter @var{string}
+This can be used to affect the initialization of new node structs.  The
+string is a C++ expression that is evaluated for initializing this slot.
+It can use the name of the slot to get the value that has originally
+been passed to the constructor.
+@end table
+
+The follwing options are available for node types:
+
+@table @samp
+@item extra @var{string} ...
+The strings are included verbatim in the C++ struct definition that will
+be generated for this node type definition.
+@item reverse @var{slot-name}
+When this option is present, a function named @dfn{reverse} will be
+generated for this node type.  This function can be used to
+destructively reverse singly linked lists of node structs.  The slot
+named @var{slot-name} is used as the link to the next node in the list.
+@end table
+
+@end defmac
+
+@node Defining Generic Functions
+@subsection Defining Generic Functions
+Generic functions are functions that dispatch at run-time to one of
+several @dfn{methods}.  The dispatching is based on the run-time type of
+first argument of the generic function.  The methods are themselves
+functions, one for each node type that should be distinuished.
+
+@defmac defgeneric name option ...
+Defines a new generic function named @var{name}.  When @var{name} is a
+symbol, then the generic function will be a normal global C++ function.
+When @var{name} is a list of symbols, the generic function will be
+generated as a C++ class member function.  The elements, which should
+all be symbols, are the elements of the fully qualified C++ name of the
+function.  For example @code{(foo bar)} would denote the C++ function
+named @code{foo::bar}.  All the intersting things about generic
+functions are expressed with options:
+
+@table @samp
+@item return @var{type}
+Specify the return type of the function and its methods.  @var{type}
+must either be defined by @code{defctype} or by @code{defnode}.
+Defaults to @code{void}.
+@item args (@var{type} @var{name}) ...
+Specify additional arguments for the generic function and its methods
+(in addition to the mandatory first argument which is always a pointer
+to a node struct).  Defaults to the empty list.
+@item methods @var{node-type} ...
+Specify some methods that should be defined for this generic functions.
+This is equivalent to
+
+@example
+(defmethods @var{name}
+  (@var{node-type} ...)
+  (args (@var{type} @var{name}) ...))
+@end example
+
+Defaults to the empty list.
+@end table
+
+@end defmac
+
+@defmac defmethods name (node-type ...) option ...
+Define methods for the generic function named @var{name}.  To uniquely
+specify a generic function, it might be necessary to use the @code{args}
+option.  The @var{node-type} list specifies which methods are defined.
+For each node type in that list, the generic function will dispatch to a
+individual C++ function.  That function is named like the generic
+function but with a @code{m_} prefix.  You must write the implementation
+of that function.
+
+When the generic function is a global function (i.e. the @var{name} is a
+symbol), then the generated C++ header file will contain prototypes for
+the method functions.  When it is a class member function the user is
+supposed to provide these prototypes on his own.
+
+You can define methods for generic functions from arbitrary chunks but
+you can only define one method for each specific node type.  You will
+receive a run-time error when you mix chunks that define conflicting
+methods.
+@end defmac
+
+@node Defining Node Extensions
+@subsection Defining Node Extensions
+
+You can add additional slots to node types after they have been defined.
+
+@defmac defextension node-type (slot ...) option ...
+Add the specified @var{slot}s to @var{node-type}.  the syntax for an
+extension @var{slot} is just like that for a normal node slot, but it
+takes different options:
+
+@table @samp
+@item = @var{string}
+The initial value of the slot.
+@end table
+
+@end defmac
+
+@node Defining Creators
+@subsection Defining Creators
+
+A @dfn{creator} can be used to customize the allocation and
+initialization of node structs.  On the C++ side, a creator is a struct
+with a member function for each node type that it should be able to
+create.
+
+@defmac defcreator name option ...
+Define a new creator named @var{name} (a symbol).  The rest is specified
+by options:
+
+@table @samp
+@item base @var{symbol}
+The base struct of the emitted C++ struct for the creator.  Defaults to
+no base class.
+@item chunks @var{chunk-name} ...
+The creator will have creation functions for all node types from the
+listed chunks.
+@item placement @var{string}
+New node structs are allocated with the C++ operator @code{new}.  The
+@var{string} can be used to give the call to that operator a placement
+expression.
+@item inits @var{node-init} ...
+Each @var{node-init} specifies how the slots of one node type should be
+initialized.  It is explained below.
+@end table
+
+@end defmac
+
+The @code{inits} is quite a complicated option.  It is a list of
+@var{node-init}s, where each @var{node-init} has this syntax:
+
+@example
+(@var{node-type} ((@var{slot-name} @var{slot-init}) ...) @var{option} ...)
+@end example
+
+This says that for the node type name @var{node-type} and all the node
+types derived from it, the slot named @var{slot-name} should be
+initialized according to @var{slot-init}.  The options might influence
+the definition of the creator function for @var{node-type}.
+
+For backwards compatability, you can also use
+@example
+(@var{node-type} (@var{slot-name} @var{slot-init}) ...)
+@end example
+when you don't have any options.
+
+When you specifiy more than one @var{node-init} for the same
+@var{node-type}, you get more than one creation function in the
+generated creator, one for each @var{node-init}.  This extends to the
+node types derived from @var{node-type}.  For example, when you have a
+node type named @samp{deriv} that is derived from the node type
+@samp{base}, and you have two @var{node-inits} for @samp{deriv} and
+two for @samp{base}, you get four creation functions for node type
+@samp{deriv}.  One for each combination of @var{node-inits}.  (The
+options are combined as well.)
+
+Each @var{slot-init} in a @var{node-init} determines how a specific slot
+should be initialized from what arguments to the creator function.
+Generally, each slot specifies zero or more arguments for the creator
+function.  These arguments are ordered just like the definition of the
+slots in the @code{defnode} statement, with slots from a base type
+appearing first.  Then, each slot specifies an expression that computes
+the initial value of the slot from these arguments.
+
+When no @var{slot-init} is specified for a certain slot slot, the
+default behaviour applies.  Such a slot specifies one argument for the
+creation function that has the same type as the slot, and its
+initialization expression just copies this argument into the slot.
+
+The follwing table lists the possibilities for a @var{slot-init}:
+
+@table @samp
+@item (wrap ((@var{type} @var{name}) ...) @var{expression})
+This is the most general form.  It specifies the arguments indicated by
+@code{(@var{type} @var{name}) ...} for the creation function and
+@var{expression} (a string) as the initialization expression.  Within
+@var{expression} the arguments are available by their @var{name}s.
+
+@item @var{string}
+This is equivalent to @code{(wrap () @var{string})}, i.e., a constant
+initialization value.
+@end table
+
+There is one option available: @code{construct-extra}.  This option
+specifies a function that should be called with the newly created node
+to perform additional initialization.  All such options are combined,
+and functions from base node types are called before functions for the
+derived node types.
+
+@node Defining Unions
+@subsection Defining Unions
+This is just a hack that I needed for making it easier to work with
+@code{bison} generated parsers.
+
+@defmac defunion name option ...
+Generate a C++ union declaration that contains pointers to all node
+structs defined in the chunks listed by the @code{chunk} option.
+@end defmac
+
+@node Using the Generated Code
+@chapter Using the Generated Code
+
+The generated code uses some C++ trickery to initialize itself at
+program start, but this machinery does not seem to work reliably on all
+platforms with all shared library implementations.  So, you might want
+to call the intitialization functions yourself.
+
+Each chunk defines a initialization function with a name like
+@code{init_name_chunk} where @code{name} is replaced with the chunk
+name.  You can call this function as often as you like, only the first
+invocation has any effect.  Each initialization function automatically
+calls the initialization functions of all chunks that are used by its
+chunk.
+
+The rule is that you should call the initialization functions of those
+chunks that you create nodes from, whose generic functions you will call
+and whose extension slots you will access.
+
+@menu
+* Node Structures::             
+* Garbage Collection::          
+* Generic Functions::           
+@end menu
+
+@node Node Structures
+@section Node Structures
+
+The generated C++ code will contain a @code{struct} type for each node
+type defined in the chunk.  The name of that struct will be determined
+by the @code{struct-fmt} or @code{struct-fmt-func} option of the chunk.
+
+Each slot of the node type is translated into a public data member of
+that struct.  For reference slots, the type of that data member is a
+pointer to the node struct of the refenced node type.  For payload
+slots, the type is as given by the @code{defctype} statement.
+
+The struct will contain a constructor with one argument for each of its
+effective slots.  The effective slots of a node type are an ordered list
+of all slots that are defined for the node type and all its base
+classes.  The order is such that the effective slots from the base type
+precede the slots directly defined in the @code{defnode} statement, and
+the direct slots are in the order given by by the @code{defnode}
+statement.  The arguments to the constructor are in the same order as
+the list of effective slots.  The type of each argument is that of its
+corresponding slot and the value of the argument is passed to the
+expression givin with the @code{init-filter} option of the slot.  The
+value of that expression is assigned to the slot.
+
+You must allocate node on the heap, via the C++ operator @code{new},
+because the garbage collector will call @code{delete} on them.
+
+In addition to the struct type, a type is declared that is a pointer to
+that struct.  The name of this type is given by the @code{pointer-fmt}
+or @code{pointer-fmt-func} option of the chunk.
+
+Each node type can be identified by an unique value of type
+@code{tree_kind} called its @dfn{kind}.  That value can be accessed via
+a name that is determined by the @code{kind-fmt} or @code{kind-fmt-func}
+option of the chunk.  Such a kind value is actually a pointer to a
+struct that contains information about the node type, but you should not
+rely on that.
+
+All node structs ultimately inherit from the predefined
+@samp{tree_base_node} struct.  That struct provides several features
+that are thus available for every node struct.
+
+@deftypemethod tree_base_node tree_kind kind ()
+Return the kind identifier of a node struct.
+@end deftypemethod
+
+@deftypemethod tree_base_node char* kind_name ()
+Return the name of the node type of a node struct.  This is the name
+given in the @code{defnode} statement.
+@end deftypemethod
+
+@deftypemethod tree_base_node bool is (tree_kind base)
+Determine whether the node struct inherits from or is of the node type
+indicated by @var{base}.
+@end deftypemethod
+
+You can also work directly with node kinds.
+
+@deftypefun char* tree_kind_name (tree_kind kind)
+Return the name of the node kind indicated by @var{kind}.
+@end deftypefun
+
+@deftypefun bool tree_is (tree_kind kind, tree_kind base)
+Determine whether @var{kind} inherits from or is the same as @var{base}.
+@end deftypefun
+
+@deftypefun tree_kind tree_base (tree_kind kind)
+Return the base kind of @var{kind}.
+@end deftypefun
+
+You can decorate node structs with arbitrary data.
+
+@deftypefun int tree_uniq_prop_key (tree_kind kind)
+Return a new integer key that can be used to identify properties on node
+structs of types indicated by @var{kind}, or derived.  For a maximally
+dense packing of keys, you should get keys for base classes before their
+derived classes.
+@end deftypefun
+
+@deftypemethod tree_base_node void put (int key, tree_prop *prop)
+Install the property struct @var{prop} in the node struct, identified by
+@var{key}.  The type @code{tree_prop} has no useful features, it is just
+there to serve as a base type for all property structs.
+@end deftypemethod
+
+@deftypemethod tree_base_node tree_prop get (int key)
+Retrieve the @code{tree_prop} struct stored at @var{key}.  If no struct
+has previously been set, return @code{NULL}.
+@end deftypemethod
+
+The extension slots use this mechanism to do their thing.  For each
+extension slot, there will be a function that takes a node struct as its
+argument and returns a reference to the storage of the extension slot.
+The name of this function is the name of the extension slot.
+
+@node Garbage Collection
+@section Garbage Collection
+
+The memory allocated to node structs is managed by a garbage collector.
+You create new nodes by calling @code{new} on the appropriate struct
+type but you should never explicitely call @code{delete} on them.
+Instead call @code{tree_garbage_collect} from time to time to collect
+and free all unused nodes.
+
+Which nodes are unused is determined by finding all nodes that are
+reachable vie reference slots from a set of root nodes.  All unreachable
+nodes are considered gartbage and are freed.  Therefore, you must make
+sure that all nodes that you care about are reachable by one or more
+pathes from a root node whenever @code{tree_collect_garbage} (or
+@code{tree_unblock_garbage_collection}, see below) is called.
+
+@deftypefun void tree_collect_garbage ()
+Find and free all nodes that are not reachable via one of the root
+nodes.  When garbage collections are blocked, this function does not
+actually perform a collection.  Instead, it sets a flag so that a
+collection is performed immediatly after collections are unblocked.
+@end deftypefun
+
+@deftypefun void tree_maybe_collect_garbage (int threshold)
+Call @code{tree_collect_garbage} when more than @var{threshold} nodes
+have been allocated since the last collection.  When @var{threshold} is
+-1, @code{tree_collect_garbage} is called unconditionally.
+@end deftypefun
+
+@deftypefun void tree_block_garbage_collection ()
+Block all attempts at garbage collection until
+@code{tree_unblock_garbage_collection} is called.  You need to call
+@code{tree_unblock_garbage_collection} for every call to
+@code{tree_block_garbage_collection} before collections are really
+unblocked.
+@end deftypefun
+
+@deftypefun void tree_unblock_garbage_collection ()
+Unblock one level of collection blocks.  When this is the last level and
+collection are again allowed, and @code{tree_collect_garbage} has been
+called while the collection were blocked, perform a collection now.
+@end deftypefun
+
+@deftypefun void tree_protect (tree_base_node *node)
+Add @var{node} to the set of root nodes.  You can add @var{node}
+multiple times and it will remain in the set until you remove it that
+many times again.
+@end deftypefun
+
+@deftypefun void tree_unprotect (tree_base_node *node)
+Remove @var{node} from the set of root nodes.
+@end deftypefun
+
+@deftypefun void tree_protect_loc (tree_base_node **loc)
+Remember @var{loc} so that whenever a collection is performed, the node
+pointed at by @code{*@var{loc}} is considered a root node.  You can add
+@var{loc} multiple times and it will remain in the set until you remove
+it that many times again.
+@end deftypefun
+
+@deftypefun void tree_unprotect_loc (tree_base_node **loc)
+Remove @var{loc} from the set of remembered root node pointers.
+@end deftypefun
+
+@node Generic Functions
+@section Generic Functions
+
+A generic function is just a normal C++ function, either a global
+function or a member function.  Calling it will dispatch to one of
+several methods, depending on the run-time type of its first argument.
+The first argument of a generic function is always a pointer to a struct
+derived from @code{tree_base_node}.  The additional arguments are as
+specified in the @code{defgeneric} statement are not inspected by the
+generic function.
+
+Once a method has been selected by the generic function, all arguments
+to the generic function are passed to that method and the return value
+of the method is returned from the generic function.
+
+A method is also a normal C++ function.  It has the same name as the
+generic function, but with a @code{m_} prefix.  It has the same
+arguments as the generic function, but the first argument has as its
+static type a pointer to the specific node struct that this method is
+intended for.  That is, all method have the same name, but they are
+distinguished by the type of their first argument.
+
+You are supposed to write the implementation of all methods announced in
+a chunk.
+
+@ignore
+@node FIRE Reference
+@chapter FIRE Reference
+@end ignore
+
+@include fireref.texi

@@ -1,0 +1,5 @@
+v2cc_mapfile 0
+work : v2cc
+std : std
+ieee : ieee
+<lib> : <lib>

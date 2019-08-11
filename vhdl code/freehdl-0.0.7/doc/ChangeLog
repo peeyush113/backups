@@ -1,0 +1,23 @@
+2007-03-22  Stefan Jahn  <stefan@lkcc.org>
+
+	* Makefile.am (EXTRA_DIST): Removed the files vhdl.yacc and
+	vhdl.lex from the dist tarball.
+
+2006-01-07  Stefan Jahn  <stefan@lkcc.org>
+
+	* freehdl-gennodes.1: New manpage for the gennodes script.
+
+	* freehdl-libtool.1: Added manpage for installed libtool.
+
+2001-09-22  Marius Vollmer  <mvo@zagadka.ping.de>
+
+	* fire.texi: Added some bits about the new `construct-extra'
+	option for creators.
+
+	* fireref.texi.in: Insert spaces after "operator" to appease
+	makeinfo.
+
+2000-02-07  Marius Vollmer  <mvo@dt.e-technik.uni-dortmund.de>
+
+	* Makefile.am: Get fire-chunk.t from freehdl/.  Pass suitable -I
+	flags to gen-nodes.

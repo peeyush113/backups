@@ -1,0 +1,21 @@
+********************************************************************************
+**                                                                            **
+**               FREEHDL Graphical User Interface Installation                **
+**                                                                            **
+********************************************************************************
+
+The FreeHDL Graphical User Interface called FHDLgui is a Tcl/Tk script. 
+To install it :
+- Install Tcl/Tk (you can type "wish" in the shell to verify installation"
+- Install Dinotrace for waveform viewing
+- Move the FHDLgui file and the pictures directory in the FreeHDL v2cc
+  directory (this will not be necessary in future versions)
+- Set the environnement variables GVHDL_PATH, DINO_PATH, PICT_PATH to correct
+  values
+
+
+When you are in the FHDLgui directory, You can run the GUI from the shell by
+typing ./FHDLgui
+
+
+

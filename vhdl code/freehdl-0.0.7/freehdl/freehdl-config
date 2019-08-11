@@ -1,0 +1,70 @@
+#! /bin/sh
+#
+# freehdl-config - utility for compiling and linking programs with FreeHDL
+#
+# Copyright (C) 2005, 2008 Stefan Jahn <stefan@lkcc.org>
+#
+# This is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+# 
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this package; see the file COPYING.  If not, write to
+# the Free Software Foundation, Inc., 51 Franklin Street - Fifth Floor,
+# Boston, MA 02110-1301, USA.  
+#
+
+option="$1"
+prefix=`pkg-config --variable prefix freehdl`
+exec_prefix=`pkg-config --variable exec_prefix freehdl`
+includedir=`pkg-config --variable includedir freehdl`
+libdir=`pkg-config --variable libdir freehdl`
+version=`pkg-config --modversion freehdl`
+cxxflags=`pkg-config --variable cxxflags freehdl`
+cxx=`pkg-config --variable cxx freehdl`
+linker=`pkg-config --variable libtool freehdl`
+
+case "$option" in
+
+  --version | -version | -v)
+	echo "$version" ;;
+
+  --ldflags | -ldflags | -l)
+	echo "-L$libdir @LDFLAGS@ @LIBS@" ;;
+
+  --libtool | -libtool | -libs)
+	echo "$libdir/libfreehdl-kernel.la $libdir/libfreehdl-std.la" ;;
+
+  --ieee | -ieee)
+	echo "$libdir/freehdl/libieee.la" ;;
+
+  --cxxflags | -cxxflags | -c)
+	echo "$cxxflags -I$includedir" ;;
+
+  --cxx | -cxx)
+	echo "$cxx" ;;
+
+  --linker | -linker)
+	echo "$linker" ;;
+
+  --help | -help | -h | *)
+	cat <<EOF
+Usage:
+  freehdl-config --version   - show installed FreeHDL version
+  freehdl-config --help      - show usage info (this message)
+  freehdl-config --ldflags   - print libraries to link with
+  freehdl-config --libtool   - print libtool libraries to link with
+  freehdl-config --ieee      - print IEEE libtool libraries to link with
+  freehdl-config --cxxflags  - print C++ compiler flags to compile with
+  freehdl-config --cxx       - print C++ compiler
+  freehdl-config --linker    - print libtool linker
+EOF
+	;;
+	
+esac

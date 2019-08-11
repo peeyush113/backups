@@ -1,0 +1,148 @@
+globals.o: main/globals.C /usr/include/assert.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h /usr/include/stdio.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/bits/types.h /usr/include/bits/pthreadtypes.h \
+  /usr/include/bits/sched.h /usr/include/libio.h /usr/include/_G_config.h \
+  /usr/include/wchar.h /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/stdlib.h \
+  /usr/include/sys/types.h /usr/include/time.h /usr/include/endian.h \
+  /usr/include/bits/endian.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/alloca.h /usr/include/string.h include/stdtypes.h \
+  include/blockpool.h include/pools.h include/output.h include/str.h \
+  include/list.h include/strtable.h include/hash_serv.h include/sparse.h \
+  include/sym.h include/typedefs.h include/const.h include/type.h \
+  include/fifo_list.h include/symtable.h include/typetable.h
+main.o: main/main.C /usr/include/assert.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h /usr/include/stdlib.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/time.h /usr/include/endian.h /usr/include/bits/endian.h \
+  /usr/include/sys/select.h /usr/include/bits/select.h \
+  /usr/include/bits/sigset.h /usr/include/bits/time.h \
+  /usr/include/sys/sysmacros.h /usr/include/alloca.h /usr/include/stdio.h \
+  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
+  /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h include/stdtypes.h include/fifo_list.h \
+  include/str.h include/sym.h include/typedefs.h include/list.h \
+  include/const.h include/type.h include/pools.h include/output.h \
+  include/blockpool.h include/dsym.h include/symtable.h include/sparse.h \
+  /usr/include/string.h include/hash_serv.h include/typetable.h
+bigblock.o: mem/bigblock.C /usr/include/assert.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h /usr/include/stdio.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/bits/types.h /usr/include/bits/pthreadtypes.h \
+  /usr/include/bits/sched.h /usr/include/libio.h /usr/include/_G_config.h \
+  /usr/include/wchar.h /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/stdlib.h \
+  /usr/include/sys/types.h /usr/include/time.h /usr/include/endian.h \
+  /usr/include/bits/endian.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/alloca.h /usr/include/string.h include/stdtypes.h \
+  include/blockpool.h
+blockpool.o: mem/blockpool.C /usr/include/assert.h \
+  /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h /usr/include/stdio.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/bits/types.h /usr/include/bits/pthreadtypes.h \
+  /usr/include/bits/sched.h /usr/include/libio.h /usr/include/_G_config.h \
+  /usr/include/wchar.h /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/stdlib.h \
+  /usr/include/sys/types.h /usr/include/time.h /usr/include/endian.h \
+  /usr/include/bits/endian.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/alloca.h include/stdtypes.h include/blockpool.h
+hash_serv.o: skel/hash_serv.C include/sysinc.h /usr/include/stdlib.h \
+  /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/sys/types.h /usr/include/bits/types.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/time.h /usr/include/endian.h /usr/include/bits/endian.h \
+  /usr/include/sys/select.h /usr/include/bits/select.h \
+  /usr/include/bits/sigset.h /usr/include/bits/time.h \
+  /usr/include/sys/sysmacros.h /usr/include/alloca.h /usr/include/stdio.h \
+  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
+  /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h /usr/include/string.h \
+  /usr/include/ctype.h include/hash_serv.h
+output.o: skel/output.C /usr/include/stdio.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/bits/types.h /usr/include/bits/pthreadtypes.h \
+  /usr/include/bits/sched.h /usr/include/libio.h /usr/include/_G_config.h \
+  /usr/include/wchar.h /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h include/output.h
+strtable.o: sym/strtable.C /usr/include/assert.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h /usr/include/string.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/stdio.h /usr/include/bits/types.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
+  /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h include/stdtypes.h include/blockpool.h \
+  include/pools.h include/output.h include/str.h include/list.h \
+  include/hash_serv.h include/sparse.h include/strtable.h
+sym.o: sym/sym.C /usr/include/assert.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h /usr/include/string.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/stdio.h /usr/include/bits/types.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
+  /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h include/stdtypes.h include/blockpool.h \
+  include/pools.h include/output.h include/str.h include/list.h \
+  include/fifo_list.h include/hash_serv.h include/sparse.h \
+  include/strtable.h include/sym.h include/typedefs.h include/const.h \
+  include/type.h include/symtable.h include/typetable.h include/dsym.h
+type.o: sym/type.C include/type.h include/stdtypes.h include/fifo_list.h \
+  include/typedefs.h include/str.h /usr/include/stdio.h \
+  /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/bits/types.h /usr/include/bits/pthreadtypes.h \
+  /usr/include/bits/sched.h /usr/include/libio.h /usr/include/_G_config.h \
+  /usr/include/wchar.h /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h include/pools.h include/output.h \
+  include/blockpool.h /usr/include/assert.h include/sym.h include/list.h \
+  include/const.h
+typetable.o: sym/typetable.C /usr/include/assert.h \
+  /usr/include/features.h /usr/include/sys/cdefs.h \
+  /usr/include/gnu/stubs.h /usr/include/string.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/stdio.h /usr/include/bits/types.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
+  /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h include/stdtypes.h include/blockpool.h \
+  include/pools.h include/output.h include/str.h include/list.h \
+  include/fifo_list.h include/hash_serv.h include/sparse.h \
+  include/strtable.h include/sym.h include/typedefs.h include/const.h \
+  include/type.h include/typetable.h
+symtable.o: sym/symtable.C /usr/include/assert.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h /usr/include/string.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stddef.h \
+  /usr/include/stdio.h /usr/include/bits/types.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
+  /usr/include/bits/wchar.h /usr/include/gconv.h \
+  /usr/lib/gcc-lib/i386-redhat-linux/2.96/include/stdarg.h \
+  /usr/include/bits/stdio_lim.h include/stdtypes.h include/blockpool.h \
+  include/pools.h include/output.h include/str.h include/list.h \
+  include/fifo_list.h include/hash_serv.h include/sparse.h \
+  include/strtable.h include/sym.h include/typedefs.h include/const.h \
+  include/type.h include/symtable.h include/typetable.h include/dsym.h

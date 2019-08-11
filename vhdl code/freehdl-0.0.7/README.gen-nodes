@@ -1,0 +1,168 @@
+[This is the README from an early prototype of the gen-nodes tool.  It
+ is quite out of date with regard to the details, but the general
+ ideas still apply.]
+
+This is a demonstration of my ideas about an extensible framework for
+representing an abstract syntax tree (actually a graph).
+
+The goal is to be able to specify a hierachy of node types and define
+`generic' functions on them.  A generic function can have different
+implementations for different types.  These implementations are called
+the methods of a generic function.  The decision which method to
+invoke when a generic functions is called is made at run-time.
+
+We want to be able to define new generic functions without changing
+the definition of the types that they work on.  Therefore, we can not
+use the virtual functions of C++.  A virtual function is part of the
+type it works on and it is therefore necessary to change the type
+itself when adding new virtual functions.  This means frequent and
+inconvenient recompilation.
+
+Furthermore, such changes to the type definitions have to be carefully
+coordinated when more than one party wants to make some.
+
+
+My proposed solution to this dilemma is to design a new, minimal OOP
+model and implement it in C++.  To make it useable, we need a tool
+that generates most of the boilerplate code for us.
+
+The demonstration uses Scheme (a Lisp dialect) for implementing the
+boilerplate generating tool and Scheme syntax for specifying the input
+to it.  I know that this is not the most popular thing to do, but it
+was easiest for me.  Therefore...
+
+*   You need to have Guile installed to play with the tool.  Version  *
+*   1.2 should work fine.  You can find it on your local GNU mirror.  *
+
+
+- How it works
+
+The node features are defined in `chunks'.  Each chunk can contain new
+node type definitions and generic functions with their methods.  You
+can also extend node types with new attributes.
+
+The chunks are independent from one-another.  That is, you can mix and
+match chunks at link time without having to recompile them.
+
+The cornerstone of the system is `gen-nodes'.  This is the tool that
+reads the description of a number of chunks and outputs C++ code for
+their implementation.
+
+- The chunk descriptions.
+
+The files that gen-nodes reads contain the description of the chunks
+in Scheme syntax.
+
+A chunk is started with this statement:
+
+    (chunk NAME OPTS..)
+
+it ends at the end of input or when the next chunk begins.  NAME
+should be a valid C++ identifier and unique among all chunks.
+
+You can define new node types:
+
+    (defnode NAME (BASE)
+       SLOTS...
+       OPTS...)
+
+The NAME is the name of the node type and should be a valid and unique
+C++ identifier.  BASE is the name of a previously defined node type
+that will be used as the base for the new type.  You can omit BASE
+(but not the parentheses around it).
+
+LINKS-AND-ATTRS can specify links to other nodes
+
+    (link NODE LINK-NAME)
+
+where NODE is the type of the node that is pointed to by the link
+named LINK-NAME.  The generated C++ struct will have a member that is
+a pointer to a struct generated for NODE.
+
+You can also specify attributes
+
+    (attr TYPE ATTR-NAME)
+
+where TYPE is string enclosed in double quotes that is a valid C++
+type, such as "char*" or "int".  The generated C++ struct will have a
+member with name ATTR-NAME and type TYPE.
+
+
+Generic functions are specified with
+
+    (defgeneric RET-TYPE GENERIC-NAME EXTRA-ARGS)
+
+This will generate a C++ function named GENERIC-NAME with return type
+RET-TYPE (which should be a string just like a attribute type).  The
+first argument of this function is a pointer to a node struct.  The
+run-time type of this node is used to dispatch to one of the methods
+of this generic function, see below.  The rest of the arguments of the
+function are specified by EXTRA-ARGS.  This should be a list like
+
+    ((TYPE ARG-NAME) (TYPE ARG-NAME) ...)
+
+When the generic function should not be global but be contained in a
+class, you specify the qualified name of it (i.e. including the class
+name) as a list of symbols.  The qualified name
+"outer_class::inner_class::func" would be written as
+
+    (outer_class inner_class func)
+
+Methods are defined with
+
+    (defmethods GENERIC-NAME NODES...)
+
+For each of the node types listed in NODES, an individual method is
+defined.  Methods are translated into ordinary C++ functions whose
+name is formed by concatenating the string "m_" and the GENERIC-NAME.
+Their first parameter is a pointer to the node type they belong to and
+the rest is specified by the EXTRA-ARGS of the generic declaration.
+
+When a generic function is invoked on a node type that has no method
+defined for it, the method for the nearest base type that has a method
+is invoked.  When no such base type exists, the program is aborted.
+
+
+You can extend existing nodes with
+
+    (extnode NODE
+       ATTRS...)
+
+NODE is the name of the node that you want to extend and ATTRS is a
+list of attribute definitions, just like for defnode.  For every
+specified attribute a function will be generated according to this
+template:
+
+    TYPE& NAME (NODE*);
+
+TYPE is the type of the attribute, NAME is the name of the attribute
+and NODE is the struct generated for the extended node.  The function
+will return a reference to the storage reserved for the attribute.
+
+
+You can add arbitary lines to the generated output with
+
+    (header-add LINES...)
+
+and
+
+    (impl-add LINES)
+
+You can split the chunk definitions into several files and use
+
+    (include FILE)
+
+to include them.
+
+
+- Invoking gen-nodes
+
+    gen-nodes CMD CHUNK IN-FILE OUT-FILE
+
+Gen-nodes reads the IN-FILE (which should contain the descriptions in
+the format explained above) and generates output for CHUNK in
+OUT-FILE, according to CMD.
+
+When CMD is `header', gen-nodes writes a header file to OUT-FILE that
+should be included by the users of the CHUNK.  When it is `impl', it
+writes the implementation of CHUNK.

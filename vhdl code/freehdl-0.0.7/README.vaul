@@ -1,0 +1,146 @@
+This is the source for VAUL.
+
+VAUL is cryptic for Vhdl Analyzer and Utility Library.  Devlopment has
+been initiated in 1994 by the University of Dortmund, Department for
+Electrical Engineering, AG SIV, Heja BVB.  Marius Vollmer
+<mvo@zagadka.ping.de> has written most of it, with guidance from
+Ludwig Schwoerer <ls@nt.e-technik.uni.dortmund.de>.  Part of this work
+is based upon work done by Thomas Dettmer and others.  See the file
+AUTHORS for details.  Many thanks to all who have contributed,
+especially to Professor Schröder, who has allowed me to distribute my
+work under the terms of the LGPL.
+
+VAUL can be used to parse and analyze arbitrary VHDL code.  The result
+is an abstract syntax graph, which is represented as a collection of
+C++ objects, tightly connected by pointers. All names used in the VHDL
+code have been resolved to their respective declarations (including
+overloaded function names) and types have been checked (excluding
+subtype constraints).
+
+It is now a serious canditate for the VHDL frontend of the FreeHDL
+project, see http://www.linuxeda.com/~freehdl.
+
+* STATUS
+
+Currently, the analyzer understands enough of VHDL to successfully
+parse and type-check the IEEE std_logic_1164 packages (including
+"arith", "signed", "unsigned", "textio", etc.), the VITAL packages
+(timing and primitives), all models of the Free Model Foundation that
+I have tested, and probably much more. It generates quite useful error
+messages, but could do better, of course.
+
+Many minor semantic checks are not done or the details are probably
+incorrect.
+
+The documentation is mostly lacking, unfortunately, but things are
+getting better.  Right now, the most useful source of information
+about the generated syntax graph is probably "v2c.cc", the source code
+of the `VHDL to pseudo-C' translator.
+
+* CONTENTS
+
+libfire/
+    Libfire contains the definition of the abstract syntax nodes, plus
+    support routines.  "Fire" stands for "Feeble Intermediate
+    Representation with Extensibility".  It is of course a pun on
+    "AIRE", the "Advanced Intermediate Representation with
+    Extensibility".  I hope to make libfire AIRE compliant sometimes
+    in the future, but right now, it is only very superficially
+    similar to AIRE.
+
+    Libfire has some unique features for extensibility that I think
+    are superior to the proposed AIRE mechanisms.  So we wont need the
+    extensibility of AIRE for implementing useful applications of the
+    syntax nodes, but it would still be nice to be compatible to
+    existing and upcoming AIRE compliant software.
+
+    Libfire is [will be] documented in the file `doc/libfire.texi'.
+
+libvaul/
+    This is the actual VHDL frontend, packaged as a library.  Included
+    is a sample application, the superficial translator from VHDL to
+    pseudo C, "v2c". There are also a few VHDL files for testing in
+    vlib/.
+
+    PLEASE NOTE: The files in vlib/ are meant for testing ONLY and
+    might therefore contain gratuitous errors and lies.  Please get
+    them afresh from their original sources if you want to use them
+    for real.
+
+    Libvaul uses libfire for its intermediate representation, of
+    course.  It adds some extensions of its own.
+
+    Right now, the relationship between libfire and libvaul is
+    somewhat perverted.  Libfire does not contain anything really
+    useful and the bulk of the syntax nodes is defined as `extensions'
+    in libvaul.  This will change over time, of course.
+
+doc/
+    Here is some documentation.
+
+* COMPILING
+
+Basically, what you do with GNU packages:
+
+    % ./configure
+    % make
+
+More complete (but generic) instructions are in INSTALL.
+
+This version uses automake/libtool as its build environment.  But as
+long as you dont want to change the Makefiles, you don't need to have
+them installed.
+
+The C++ rendition of the abstract syntax node definitions is generated
+by a tool written in Guile Scheme.  The generated files are contained
+in the distribution, so you shouldn't need to run the Scheme program
+unless you modify the definitions in the *.t files.  Guile version 1.2
+from your local GNU mirror should be fine.
+
+You probably need GNU C++ (2.6.3 and up) and maybe some other GNUish
+tools. It should compile at least on GNU/Linux, SunOS 4 and 5, maybe
+with some tweaking.
+
+* RUNNING
+
+There is no real documentation for the library or the example
+programs.  The doc/ directory contains the beginnings of libfire.texi,
+the documentatzion for the general syntax graph support and the
+particular node types used by VAUL, but it is still very incomplete.
+But until then, here are some hints about how to run `v2c' on the
+sample VHDL files.
+
+There are some VHDL files in libvaul/vlib/* that can be used to test
+`libvaul'. Each VHDL design library is contained in a separate
+subdirectory.
+
+    vlib/std/
+	The packages std.standard and std.textio.
+
+    vlib/ieee/
+	The IEEE std_logic_1164 packages and the VITAL timing and
+	primitive packages.	
+
+    vlib/fmf/
+	Some packages and models from the Free Model Foundation.
+
+Libvaul does not store its intermediate representation of the VHDL
+source code on disk.  That means that whenever a design unit is needed
+during analysis, the source code for it has to be found and
+reanalyzed.  Only two kinds of design units are ever needed during
+analysis: packages that are mentioned in USE clauses, and entities
+that are mentioned in binding indications. [right?]
+
+Libvaul can not find the needed source code by itself, it needs help
+from the application.  v2c has a very simple rule for finding the
+source code.  For a package or entity named UNIT, that is contained in
+a design library named LIB, it looks for "vlib/LIB/UNIT.vhd" and
+"vlib/LIB/UNIT.vhdl".
+
+    % cd .../libvaul
+
+	v2c knows that the libraries are in vlib/
+
+    % ./v2c -lfmf vlib/fmf/nlb6201.vhd
+
+	`-lfmf' means: use the "fmf" library as the working library.

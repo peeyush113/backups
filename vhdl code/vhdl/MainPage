@@ -1,0 +1,373 @@
+
+/*! \mainpage
+
+<h3>
+pool: Pooled memory allocation class
+</h3>
+
+<h4>
+Overview
+</h4>
+
+<p>
+Many programs, especially compilers and 3D graphics programs, allocate
+large complex data structures.  For example, a compiler will allocate
+lists of abstract syntax trees that represent the statements in a
+program.  These trees will be decorated with symbol and type
+information.
+</p>
+
+<p>
+When processing is complete, dynamically allocated data structures
+must be deallocated.  Calling the C++ delete function for every object
+can be very time consuming.  The pool allocator allows memory to be
+rapidly deallocated.  Memory is allocated in large pools which require
+only a few calls to return to the operating system.
+</p>
+
+<h4>
+Memory Pool Algorithm
+</h4>
+
+
+<p>
+Each <b>pool</b> object allocates a unique memory pool from a list of
+memory pools (see the global variable <b>memory_pools</b>, which is
+an instance of the mem_pool template).  The pool is allocated in the
+class constructor and deallocated in the destructor.  Since the
+constructor and destructor allocate and deallocate pools, the copy
+constructor is not allowed.  An attempt to use the copy constructor
+will result in a compile time error, since the copy constructor is
+<i>private</i>.
+</p>
+
+<p>
+The skeleton of the pool class is shown below.  The <b>pr</b> member
+function prints information about the memory allocation pool.
+</p>
+
+<pre>
+
+class pool {
+private:
+// The copy constructor for this class should never be called,
+// so declare private
+    pool( const pool &p) {}
+public:
+    pool(void);
+    ~pool(void);
+    void *GetMem( unsigned int num_bytes );
+    void pr( FILE *fp = stdout );
+};
+
+
+</pre>
+
+<h3>
+Overloading New in C++
+</h3>
+
+<h4>
+Pooled Memory Allocation
+</h4>
+<p>
+Most large C++ programs make use of dynamically allocated memory.
+This is especially true of EDA applications (simulators and
+tools for VLSI chip design), where the designer can
+never safely set an upper limit on application size.  In many cases
+large amounts of dynamically allocated memory is consumed by
+interconnected objects which are not themselves very large.  The time
+consumed allocating objects can be minimized, but is unavoidable.  A
+significant amount of processing time can also be consumed traversing
+the dynamic data structures and returning them to the system using the
+default C++ delete function.  Time consuming memory recovery can be
+avoided by using a pool based memory allocator.
+</p>
+
+<p>
+A pool based memory allocator allocates large blocks of memory and
+then allocates smaller objects from these blocks.  When it is time
+to recover memory, the entire pool is deallocated at once.  This
+usually involves returning only a few large memory blocks to the
+system.  This greatly reduces the time consumed by memory recovery.
+</p>
+
+<h4>
+Object Allocation and Initialization
+</h4>
+
+<p>
+If a C++ object is allocated from a memory pool, its constructor will
+not be called by default.  This can sometimes be handled by
+initializing the object with an explicit call to the constructor.
+For example:
+</p>
+
+<pre>
+
+  my_class *pMyClass;
+
+  pMyClass = (my_class *)pool.GetMem( sizeof( my_class ) );
+  *pMyClass = my_class();  <i>// invoke the constructor</i>
+</pre>
+
+<p>
+This approach has several problems.  The constructor invokation above
+creates a temporary instance of the class <i>my_class</i>.  This class
+is then copied into the memory pointed to by <TT>pMyClass</TT>.  After
+the class is copied, the destructor for <i>my_class</i> will be
+called.  If memory allocation takes place in the constructor and
+deallocation takes place in the destructor, there can be a problem.
+For example, if the class pointed to by <TT>pMyClass</TT> is
+initialized with a pointer the memory allocated by the <i>my_class</i>
+constructor, this same memory will be deallocated by the destructor.
+When the assignment completes, the class pointed to by
+<TT>pMyClass</TT> will point to deallocated memory, which is not what
+the programmer intended.
+</p>
+
+<p>
+The problem above can be handled by adding <TT>init</TT> and
+<TT>dealloc</TT> class functions which can be called explicitly
+to allocate memory.  For example, the <TT>init</TT> function can
+be called after the class constructor copy.
+</p>
+
+<p>
+Unfortunately, the scheme outlined above is totally inadequate
+if the class have virtual functions.  The class constructor will
+not initialize the virtual function table with the appropriate
+function addresses.
+</p>
+
+<h4>
+Overloading New
+</h4>
+
+<p>
+Since at least 1993 C++ has defined a way to overload the
+<b>new</b> operator.  This provides a simple and natural way to
+allocate an object from a memory pool and initialize it properly.  The
+overloaded <b>new</b> function allocates memory from the memory pool
+and the C++ compiler generates code to initialize the virtual function
+table and to invoke the class constructor.  
+</p>
+
+<p>
+The C++ code below has a base class (cleverly named <i>base</i>)
+and a derived class <i>base_one</i>.  The base class has an
+overloaded version of new, which takes two arguments: the number
+of bytes to allocate and a pointer to a memory pool allocation
+object.  The compiler automatically plugs in the type size
+(the first argument to the overloaded <b>new</b>).  The call
+to <b>new</b> then takes the form
+</p>
+
+<pre>
+    pClass = new( <i>user args</i> ) <i>type</i>
+</pre>
+
+<p>
+which is expanded into a call to the overloaded new function
+</p>
+
+<pre>
+    void *operator new( <i>type size</i>, <i>user args</i> );
+</pre>
+
+<p>
+For more details see section 5.3.3 of the ANSI C++ standard.
+
+<pre>
+
+class base {
+public:
+    base() { }
+
+    void *operator new( unsigned int num_bytes, pool *mem)
+    {
+	return mem->GetMem( num_bytes);
+    }
+
+    virtual void pr(void) = 0;
+};
+
+
+class base_one : public base {
+private:
+    int a;
+public:
+    base_one() {}
+
+    void pr(void) 
+    {
+       // local print
+    }
+};
+
+
+main()
+{
+    base *pB1;
+    pool mem;
+
+    pB1 = new( &mem ) base_one;
+    pB1->pr();
+}
+
+</pre>
+
+<h3>
+strtable: string table class
+</h3>
+
+<h4>
+Overview
+</h4>
+
+<p>
+The string table (<b>strtable</b>) guarantees that all strings in the
+string table are unique.  For example, if the <b>find_string</b>
+function is called twice for the same string, the string will be
+stored once.  The second call will return the address of the first
+string stored.
+</p>
+
+<p>
+If two strings are stored in the string table, they can be compared by
+comparing their addresses, since all strings in the table are unique.
+If the addresses are the equal, the strings are the same string.
+</p>
+
+<p>
+The string table classes stores strings that are packaged in the
+STRING class (see str.h).
+</p>
+
+<h4>
+Hash Algorithm
+</h4>
+
+<p> 
+The <b>strtable</b> class is a hash table that can store an
+unlimited number of strings, since the hash table uses collision
+lists.  As with any hash table of this sort, as the number of strings
+heads toward infinity, the performance of the hash table will become
+that of a linked list.  
+</p>
+
+<p>
+In practice the performance of this hash table depends on the table
+size.  In order to minimize the amount of memory used by a mostly
+empty table, the <b>strtable</b> class is based on a sparse array
+backbone.  The size of the sparse array is given in the
+<b>strtable</b> constructor.  This size given to the constructor
+will be rounded to the nearest power of two.  The total size of
+the hash table is the square of the initialization size.  So if
+the <b>strtable</b> constructor is passed 1024, the total table
+size will be 1024 * 1024, or 1 million hash chains.
+</p>
+
+<p>
+The sparse array is initially empty.  When an element is added, an
+array of, in this case, 1024 elements will be added.  At this point
+array elements 0..1023 will be present.  If a hash element is added
+outside this range, another 1024 elements will be added.
+</p>
+
+<h4>
+Performance
+</h4>
+
+<p>
+This hash table has been tested with the <a
+href="http://www.best.com">best.com</a> on line dictionary.  This
+dictionary consists of about 250K words.  When this dictionary is
+entered in the has table, the sparse array is 99 percent allocated.
+That is, almost all of the 1024 element arrays linked into the 1024
+element back bone have been allocated.
+The longest hash collision chain is 7 elements.
+</p>
+
+<h4>
+<i>strtable</i> constructor
+</h4>
+
+<p>
+The <b>strtable</b> constructor is passed two arguments:
+</p>
+<ul>
+<li>
+The hash backbone size
+</li>
+<li>
+The address of memory allocation pool object
+</li>
+</ul>
+
+<p>
+For example:
+</p>
+
+<pre>
+
+  pool pool_obj;
+
+  strtable string_table(1024, &pool_obj );
+</pre>
+
+<p>
+When a string is entered into the string table, it will
+be copied.  The memory allocation object is used to
+allocate storage for the string.  The hash table and
+the collision lists are allocated via the C++ <i>new</i>
+function.  The <b>strtable</b> destructor will deallocate
+the hash table and collsion lists.  However, the user is
+responsible for deallocating the memory for the strings.
+</p>
+
+<p>
+The skeleton of the string table class is shown below:
+</p>
+
+<pre>
+
+class strtable : public hash_services 
+{
+public:
+    strtable( unsigned int size, void *(*GetMem)(unsigned int));
+
+    void dealloc();
+
+    ~strtable();
+
+    STRING find_string( STRING item, Boolean insert = TRUE);
+
+    STRING find_string( const char *str, Boolean insert = TRUE );
+
+    unsigned int get_max_list(void);
+
+    void pr(void);
+
+    //
+    // The functions first and get_item are used to iterate through the
+    // string table.  Note that the strings will be returned in hash order,
+    // which is pseudorandom.  An example is shown below:
+    //
+    //   STRING str;
+    //
+    //   for (str = strtab.first(); str.GetText() != NULL; str = strtab.get_str()) {
+    //       printf("%s\n", str.GetText() );
+    //   }
+    //
+
+    STRING first(void);
+
+    STRING get_str(void);
+
+}; // class hash_label
+
+</pre>
+
+
+ */

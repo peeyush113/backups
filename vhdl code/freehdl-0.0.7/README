@@ -1,0 +1,56 @@
+This is a early test release of the FreeHDL package.  As such, nothing
+is final yet and everything is bound to be changed.  Please tell us
+everything that you don't like about this package so that we can
+improve it.  You are also allowed to tell us about the things that you
+do like, of course, so that we don't make them worse.
+
+Installation
+------------
+
+This package should behave like a regular GNUish package.  Generic
+installation instructions for such a package can be found in the file
+INSTALL.
+
+Right now, there is only enough documentation to get you to run the
+included example. Further, some additional info about the
+compiler/simulator (e.g. a list of supported VHDL constructs) can be
+found in README.v2cc.
+
+Pick a suitable place to install this package in.  The default is
+/usr/local.  Then run
+
+    % ./configure --prefix <install-prefix>
+    % make
+    % make install
+
+The last step will create some directories below <install-prefix> and
+will put the created programs and some data files there. However, if
+you prefer *not* to install the package (currently the simulator is
+very limited, hence you will not be able to use it for "real" work!) 
+check out README.v2cc for some additional info on how to execute the
+compiler/simulator. Further, if your computer should run out of memory
+during compilation run "make CXXFLAGS=-g" instead of just "make". 
+
+You must make sure that the installed files can be found by your
+system (otherwise you will only be able to compile an execute models
+copied to the v2cc subdirectory).  That is, the directory
+<install-prefix>/bin should be on your path and your linker should be
+able to find libraries in <install-prefix>/lib.  We are not yet ready
+to isolate you from these technicalities.
+
+Running the example
+-------------------
+
+See file "README.v2cc" for some information on how to compile/run 
+the example vhdl models.  
+
+
+Where to send bug reports / suggestions / comments
+--------------------------------------------------
+
+If your report addresses a parser related topics then contact Marius
+Vollmer <mvo@zagadka.ping.de>. If it is related to the code generator
+or compiler then send an email to Edwin Naroska
+<edwin@ds.e-technik.uni-dortmund.de>. If your are not sure send it to
+Edwin. He will take care of forwarding your report to the appropriate
+recipient.
