@@ -1,0 +1,265 @@
+package cetus.transforms;
+
+import java.io.*;
+import java.lang.reflect.*;
+import java.util.*;
+
+import cetus.analysis.*;
+import cetus.exec.*;
+import cetus.hir.*;
+import cetus.transforms.MCUDAUtils;
+
+/**
+ * Interfaces a function call to the MCUDA runtime library.
+ * First creates a type definition for this function's parameter 
+ * struction.  
+ * Then modifies the current function to now accept the implicit 
+ * block and grid variables of the CUDA programming model, 
+ * in addition to a pointer to an instance of the parameter structure.
+ * Lastly, creates a new function with the original function 
+ * signature, whose sole purpose is to construct the paramter 
+ * structure, and pass the kernel invocation to the runtime.  
+ * The kernel function is renamed and passed as one of the 
+ * kernel invocation parameters.  
+ */
+public class WrapDeviceParams extends ProcedureTransformPass
+{
+  public String getPassName()
+  {
+    return new String("[WrapDeviceParams-MCUDA]");
+  }
+
+  public WrapDeviceParams(Program program)
+  {
+    super(program);
+  }
+
+  public void transformProcedure(Procedure proc)
+  {
+    String interfaceName = proc.getName().toString();
+    String kernelName = interfaceName + "__MCUDA_kernel";
+    String paramStructName = kernelName + "_params";
+    Identifier paramStructID = new Identifier(paramStructName);
+    UserSpecifier paramStructType;
+    TranslationUnit kernelFile = (TranslationUnit)proc.getParent();
+
+    
+    // Set up the structure for the parameters 
+    Iterator iter = proc.getParameters().iterator();
+    ClassDeclaration paramStruct = 
+      new ClassDeclaration(ClassDeclaration.STRUCT, 
+	  			(Identifier)paramStructID.clone());
+    
+    while(iter.hasNext())
+    {
+      VariableDeclaration pdecl = ((VariableDeclaration)iter.next());
+      if(pdecl.toString().compareTo("void") == 0)
+	continue;
+
+      paramStruct.addDeclaration((Declaration)pdecl.clone());
+    }
+
+    kernelFile.addDeclarationBefore(proc, paramStruct);
+
+    // Create the typedef for easier access
+    List typeList = new ChainedList();
+    typeList.add(Specifier.TYPEDEF);
+    //Shouldn't need a user specifier for this, but it looks like 
+    //there isn't another way.
+    typeList.add(new UserSpecifier(new Identifier("struct")));
+
+    paramStructType = new UserSpecifier((Identifier)paramStructID.clone());
+    typeList.add(paramStructType);
+    
+    VariableDeclarator paramTypedef = 
+      new VariableDeclarator((Identifier)paramStructID.clone());
+
+    VariableDeclaration paramTypeDecl = 
+      new VariableDeclaration(typeList, paramTypedef);
+
+    kernelFile.addDeclarationBefore(proc, paramTypeDecl);
+
+    
+    // Create new interface function body
+    //
+    // Instantiate a variable for the parameter structure
+    CompoundStatement interfaceBody = new CompoundStatement();
+
+    
+    Identifier newParams = MCUDAUtils.getParamsID();
+    List newParamSpecs = new ChainedList();
+    
+    paramStructType = new UserSpecifier((Identifier)paramStructID.clone());
+    newParamSpecs.add(paramStructType);
+    newParamSpecs.add(PointerSpecifier.UNQUALIFIED);
+    
+    VariableDeclarator paramsDeclarator = 
+       new VariableDeclarator(newParams);
+
+
+    VariableDeclaration paramsDecl = 
+      new VariableDeclaration(newParamSpecs, paramsDeclarator);
+
+    interfaceBody.addDeclaration(paramsDecl);
+
+
+    //Instantiate a malloc
+    SizeofExpression mallocArg = 
+      new SizeofExpression((Identifier)newParams.clone());
+    FunctionCall allocation = new FunctionCall(new Identifier("malloc"));
+    allocation.addArgument(mallocArg);
+    paramStructType = new UserSpecifier((Identifier)paramStructID.clone());
+    List specifierList = new ChainedList();
+    specifierList.add(paramStructType);
+    specifierList.add(PointerSpecifier.UNQUALIFIED);
+
+    Typecast allocTypecast = new Typecast(specifierList, allocation);
+
+    AssignmentExpression assignAlloc = 
+      new AssignmentExpression(MCUDAUtils.getParamsID(),
+	  			AssignmentOperator.NORMAL,
+				allocTypecast);
+
+    ExpressionStatement allocStmt = 
+      new ExpressionStatement(assignAlloc);
+
+    interfaceBody.addStatement(allocStmt);
+
+
+    //For each parameter, pack it in.
+    iter = proc.getParameters().iterator();
+    
+    
+    while(iter.hasNext())
+    {
+      VariableDeclaration pdecl = ((VariableDeclaration)iter.next());
+      if(pdecl.toString().compareTo("void") == 0)
+	continue;
+      
+      VariableDeclarator pdeclName = 
+	(VariableDeclarator) pdecl.getDeclarator(0);
+      Identifier pID = 
+	(Identifier) pdeclName.getDirectDeclarator();
+      
+      //Assign parameter value to structure
+      AccessExpression paramField =
+	new AccessExpression(MCUDAUtils.getParamsID(),
+	    			AccessOperator.POINTER_ACCESS,
+				(Identifier)pID.clone());
+
+      AssignmentExpression assignParam = 
+	new AssignmentExpression(paramField, AssignmentOperator.NORMAL,
+	    				(Identifier)pID.clone());
+
+      ExpressionStatement assignParamStmt = 
+	new ExpressionStatement(assignParam);
+
+      interfaceBody.addStatement(assignParamStmt);
+    }
+
+    //And finally, call the kernel interface
+    
+    FunctionCall kernelLaunch = 
+      new FunctionCall(new Identifier("__cuda_kernel_launch"));
+
+    kernelLaunch.addArgument(new Identifier(new String(kernelName)));
+    
+    kernelLaunch.addArgument(MCUDAUtils.getGdimID());
+    kernelLaunch.addArgument(MCUDAUtils.getBdimID());
+
+    UnaryExpression paramAddress = 
+      new UnaryExpression(UnaryOperator.ADDRESS_OF, 
+	  			MCUDAUtils.getParamsID());
+    
+    List voidPPList = new ChainedList();
+    voidPPList.add(Specifier.VOID);
+    voidPPList.add(PointerSpecifier.UNQUALIFIED);
+    voidPPList.add(PointerSpecifier.UNQUALIFIED);
+    
+    Typecast voidPPTypecast = new Typecast(voidPPList, paramAddress);
+    
+    kernelLaunch.addArgument(voidPPTypecast);
+
+    ExpressionStatement launchStmt = 
+      new ExpressionStatement(kernelLaunch);
+
+    interfaceBody.addStatement(launchStmt);
+
+    
+   
+    // New body for the kernel function
+    CompoundStatement bodywrapper = new CompoundStatement();
+    CompoundStatement oldbody = proc.getBody();
+
+    // Add declarations for unpacking the parameters
+    
+    //Going to need several copies of the typecasted parameter pointer
+    Identifier params = MCUDAUtils.getParamsID();
+    specifierList = new ChainedList();
+    
+    paramStructType = new UserSpecifier((Identifier)paramStructID.clone());
+    specifierList.add(paramStructType);
+    specifierList.add(PointerSpecifier.UNQUALIFIED);
+    
+    Typecast paramsTypecast = new Typecast(specifierList, );
+
+    
+
+    // Loop over parameters
+    List pList = new LinkedList();
+
+    iter = proc.getParameters().iterator();
+    
+    while(iter.hasNext())
+    {
+      VariableDeclaration pdecl = ((VariableDeclaration)iter.next());
+      if(pdecl.toString().compareTo("void") == 0)
+	continue;
+      Identifier id = (Identifier) ((VariableDeclarator) (pdecl.getDeclarator(0)) ).getDirectDeclarator();
+      AccessExpression param_access = 
+	new AccessExpression((Expression)paramsTypecast.clone(), 
+	    			AccessOperator.POINTER_ACCESS, 
+				(Identifier)id.clone());
+      
+      //pdecl.getParent().removeChild(pdecl);
+      
+      pList.add(pdecl.clone());
+      
+      // Add a local variable declaration, and 
+      // assign the unpacked parameter to it
+      bodywrapper.addDeclaration((VariableDeclaration)pdecl.clone());
+
+      AssignmentExpression paramAssignExpr = 
+	new AssignmentExpression(id, AssignmentOperator.NORMAL, 
+	    				param_access);
+      bodywrapper.addStatement(new ExpressionStatement(paramAssignExpr));
+      
+    }
+    bodywrapper.addStatement(oldbody);
+   
+    //Get the parameter list for a kernel function (runtime implementation specified)
+    List kernelParams = MCUDAUtils.getKernelParams();
+
+    //Declare the new kernel
+    ProcedureDeclarator newKernelDecl = 
+      new ProcedureDeclarator(new Identifier(new String(kernelName)), kernelParams);
+
+    List retType = (new ChainedList()).addAllLinks(proc.getReturnType());
+    CompoundStatement newbody = new CompoundStatement();
+    
+
+    newbody.addDeclaration(MCUDAUtils.getTidDecl());
+    newbody.addStatement(MCUDAUtils.NewNestedThreadLoop(3, bodywrapper));
+    
+    Procedure wrapped = new Procedure(Specifier.VOID, newKernelDecl, newbody);
+    kernelFile.addDeclarationBefore(proc, wrapped);
+
+    //Add the implicit kernel function parameters
+    proc.addDeclaration(MCUDAUtils.getGdimDecl());
+    proc.addDeclaration(MCUDAUtils.getBdimDecl());
+
+    //And set the previously created interface body
+    proc.setBody(interfaceBody);
+  }
+  
+}

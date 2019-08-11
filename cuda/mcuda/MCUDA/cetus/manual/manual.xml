@@ -1,0 +1,1346 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN" "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+<book lang="en">
+
+<bookinfo>
+<title>The Cetus Compiler Manual</title>
+
+<authorgroup>
+<author>
+ <firstname>Troy A.</firstname>
+ <surname>Johnson</surname>
+ <affiliation>
+   <orgname>Purdue University</orgname>
+   <orgdiv>ParaMount Research Group</orgdiv>
+   <address><email>tajohnson@ieee.org</email></address>
+ </affiliation>
+</author>
+<author>
+ <firstname>Sang-Ik</firstname>
+ <surname>Lee</surname>
+ <affiliation>
+   <orgname>Purdue University</orgname>
+   <orgdiv>ParaMount Research Group</orgdiv>
+   <address><email>sangik@ecn.purdue.edu</email></address>
+ </affiliation>
+</author>
+</authorgroup>
+
+<copyright>
+  <year>2004-2005</year>
+  <holder>ParaMount Research Group, Purdue University</holder>
+</copyright>
+
+<abstract>
+<para>
+Cetus is a source-to-source parallelizing compiler for ANSI C.
+It can run on any system supporting Sun's Java 2 Runtime Environment, Standard Edition
+(<ulink url="http://java.sun.com/j2se/1.5.0/">version 1.5.0</ulink> or later).
+If you are referring to a printed version of this document, the most recent version
+can be found at http://cetus.ecn.purdue.edu/.
+You can view this manual as a single HTML file
+<ulink url="http://cetus.ecn.purdue.edu/manual/manual.html">here</ulink>.
+</para>
+</abstract>
+
+</bookinfo>
+
+<chapter id="Introduction">
+<title>Introduction</title>
+
+<para>
+Parallelizing compiler technology is most mature for the Fortran 77 language.
+The simplicity of the language without pointers
+or user-defined types makes it easy to analyze and to develop many advanced compiler
+passes. By contrast, parallelization technology for modern languages, such as
+Java, C++, or even C, is still in its infancy.  When trying to engage in such
+research, we were faced with a serious challenge. We were unable to find a
+parallelizing compiler infrastructure that supports interprocedural analysis,
+exhibits state-of-the-art software engineering techniques to achieve shorter development time,
+and which would allow us to compile large, realistic applications.
+However, we feel these properties are of paramount importance.
+They enable a compiler writer to develop "production strength"
+passes. Production strength passes, in turn, can work in the context of the
+most up-to-date compiler technology and lead to compiler research
+that can be evaluated with full suites of realistic applications.
+Many people have observed and criticized the lack of such thorough evaluations
+in current research papers.  The availability of an easy-to-use compiler
+infrastructure would help improve this situation significantly. Hence,
+continuous research and development in this area are among the most important
+tasks of the compiler community. Cetus contributes to this effort.
+</para>
+</chapter>
+
+<chapter id="License">
+<title>License</title>
+<para>
+In recent years, there has been an explosion in the number of open-source licenses, and we
+do not wish to contribute further to that problem, but this was the only license upon which
+all involved parties were able to agree.  We suggest that you do not use this license for
+projects that do not involve Cetus.
+</para>
+<para>
+The Cetus License is a modified Artistic License, similar to the Perl Artistic License.
+Artistic Licenses are generally <ulink url="http://www.opensource.org">OSI</ulink> approved,
+although this specific license has not been submitted to OSI.  It is equivalent
+to <ulink url="http://www.opensource.org/licenses/artistic-license.php">this license</ulink>
+with condition 3a modified, 3c and 4c removed, condition 4b modified to cover Java's tendency to link
+everything at run time, and the insertion of condition 8 (which is optional, but encouraged).
+</para>
+<para>
+Begin License
+</para>
+<para>
+Preamble
+</para>
+<para>
+The intent of this document is to state the conditions under which a Package may
+be copied, such that the Copyright Holder maintains some semblance of artistic
+control over the development of the package, while giving the users of the
+package the right to use and distribute the Package in a more-or-less customary
+fashion, plus the right to make reasonable modifications.
+</para>
+<para>
+Definitions
+</para>
+
+<itemizedlist mark="bullet">
+<listitem>
+  <para>
+      "Package" refers to the collection of files distributed by the Copyright
+      Holder, and derivatives of that collection of files created through
+      textual modification.
+  </para>
+</listitem>
+<listitem>
+  <para>
+    "Standard Version" refers to such a Package if it has not been modified, or
+      has been modified in accordance with the wishes of the Copyright Holder.
+  </para>
+</listitem>
+<listitem>
+  <para>
+    "Copyright Holder" is whoever is named in the copyright or copyrights for
+      the package.
+  </para>
+</listitem>
+<listitem>
+  <para>
+    "You" is you, if you're thinking about copying or distributing this
+      Package.
+  </para>
+</listitem>
+<listitem>
+  <para>
+    "Reasonable copying fee" is whatever you can justify on the basis of
+      media cost, duplication charges, time of people involved, and so on.
+      (You will not be required to justify it to the Copyright Holder, but
+      only to the computing community at large as a market that must bear the
+      fee.)
+  </para>
+</listitem>
+<listitem>
+  <para>
+    "Freely Available" means that no fee is charged for the item itself,
+      though there may be fees involved in handling the item. It also means
+      that recipients of the item may redistribute it under the same conditions
+      they received it.
+  </para>
+</listitem>
+</itemizedlist>
+
+<para>
+  Conditions
+</para>
+
+<orderedlist numeration="arabic">
+<listitem>
+  <para>
+You may make and give away verbatim copies of the source form of the
+Standard Version of this Package without restriction, provided that you
+duplicate all of the original copyright notices and associated disclaimers.
+  </para>
+</listitem>
+<listitem>
+  <para>
+You may apply bug fixes, portability fixes and other modifications derived
+from the Public Domain or from the Copyright Holder. A Package modified in
+such a way shall still be considered the Standard Version.
+  </para>
+</listitem>
+<listitem>
+  <para>
+You may otherwise modify your copy of this Package in any way, provided
+that you insert a prominent notice in each changed file stating how and when
+you changed that file, and provided that you do at least ONE of the following:
+  </para>
+  <orderedlist numeration="loweralpha">
+  <listitem>
+    <para>
+place your modifications in the Public Domain or otherwise make them
+Freely Available, such as by posting said modifications to Usenet or an
+equivalent medium, or placing the modifications on a major archive site
+such as ftp.uu.net, and by informing the Copyright Holder of this modification
+and by allowing the Copyright Holder to include your
+modifications in the Standard Version of the Package.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+use the modified Package only within your corporation or organization.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+make other distribution arrangements with the Copyright Holder.
+    </para>
+  </listitem>
+  </orderedlist>
+</listitem>
+<listitem>
+  <para>
+You may distribute the programs of this Package in object code or executable
+form, provided that you do at least ONE of the following:
+  </para>
+  <orderedlist numeration="loweralpha">
+  <listitem>
+    <para>
+distribute a Standard Version of the executables and library files,
+together with instructions (in the manual page or equivalent) on where
+to get the Standard Version. The Standard Version may be obtained here:
+http://cetus.ecn.purdue.edu
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+accompany the distribution with the machine-readable source of the
+Package with your modifications.  Java class files and archives
+(JAR files) supplied by you and called from the modified Package shall
+be considered part of the modified Package for redistribution purposes,
+to the extent that ANY of your modifications would be useless without
+those class files and archives.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+make other distribution arrangements with the Copyright Holder.
+    </para>
+  </listitem>
+  </orderedlist>
+</listitem>
+<listitem>
+  <para>
+You may charge a reasonable copying fee for any distribution of this Package.
+You may charge any fee you choose for support of this Package. You may not
+charge a fee for this Package itself. However, you may distribute this Package
+in aggregate with other (possibly commercial) programs as part of a larger
+(possibly commercial) software distribution provided that you do not advertise
+this Package as a product of your own.
+  </para>
+</listitem>
+<listitem>
+  <para>
+The scripts and library files supplied as input to or produced as output from
+the programs of this Package do not automatically fall under the copyright of
+this Package, but belong to whomever generated them, and may be sold
+commercially, and may be aggregated with this Package.
+  </para>
+</listitem>
+<listitem>
+  <para>
+The name of the Copyright Holder may not be used to endorse or promote
+products derived from this software without specific prior written permission.
+  </para>
+</listitem>
+<listitem>
+  <para>
+If you did not receive this Package directly from the Copyright Holder, then
+you are encouraged to notify the Copyright Holder by sending e-mail to
+cetus@ecn.purdue.edu for the purpose of estimating the number of users and
+listing various uses of the Package.
+  </para>
+</listitem>
+<listitem>
+  <para>
+THIS PACKAGE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+  </para>
+</listitem>
+</orderedlist>
+</chapter>
+
+<chapter id="Obtaining-Cetus">
+<title>Obtaining Cetus</title>
+
+<sect1>
+<title>Source Code and Binaries</title>
+
+<para>
+Cetus is a set of intermediate representation (IR) classes and optimization passes.
+It currently has a built-in C parser written in Antlr, but relies on a separate
+program to parse C++.  Thus, there are three items you need to obtain for full functionality.
+</para>
+
+<para>
+  <itemizedlist mark="bullet">
+  <listitem>
+    <para>The intermediate representation and compiler passes.  These are written in Java.</para>
+  </listitem>
+  <listitem>
+    <para><ulink url="http://www.antlr.org">ANTLR</ulink></para>
+  </listitem>
+  <listitem>
+    <para>A separate parser for a language supported by Cetus: C or C++.  The parser must
+          produce parse-tree output formatted as
+          <ulink url="http://www.graphviz.org">graphviz</ulink> files.
+    </para>
+  </listitem>
+  </itemizedlist>
+</para>
+
+<para>
+The IR and passes are available at
+<ulink url="http://www.ece.purdue.edu/ParaMount/Cetus/download.html">http://www.ece.purdue.edu/ParaMount/Cetus/download.html</ulink>.
+This part runs on any system supporting a Java run-time environment, and is covered by the above license.
+It is available now.
+</para>
+
+<para>
+Source and binaries for Solaris and Linux will be supplied for the separate parser.
+The parser is covered by the <ulink url="http://www.opensource.org/licenses/gpl-license.php">GNU General
+Public License</ulink>.  It incorporates some code and ideas from <ulink url="http://gcc.gnu.org/">GCC</ulink>
+for increased compatibility with <ulink url="http://www.spec.org/">SPEC</ulink> benchmarks.  It also
+includes some code from the <ulink url="http://gcc.gnu.org/onlinedocs/libiberty/">libiberty</ulink>
+library to provide command-line handling on systems lacking library support for
+command-line handling.  Purdue Solaris is an example of such a system where neither
+<ulink url="http://packages.debian.org/unstable/base/libpopt0">libpopt</ulink> nor 
+<command>getopt_long</command> are available.  (The standard <command>getopt</command> is insufficient
+for compilers, which have many options and cannot be limited to single-character flags.)
+Note that there is no linking, not even at run time, between the Cetus IR code,
+written in Java, and the parser code, written in C++.  The parser and IR communicate through an
+intermediate data file that uses the <ulink url="http://www.graphviz.org">graphviz</ulink> format.
+</para>
+</sect1>
+
+</chapter>
+
+<chapter id="Compiling-Cetus">
+<title>Compiling Cetus</title>
+
+<para>
+The following tools are useful to compile Cetus.  You do not need them to use
+Cetus if you have a Cetus JAR file, although it is normally more useful for compiler
+writers to modify Cetus.
+</para>
+
+<itemizedlist mark="bullet">
+<listitem>
+  <para>
+  A Java compiler.  Sun's Java compiler, version 1.5.0 or later, is recommended, because that is
+  what we use.
+  </para>
+</listitem>
+<listitem>
+  <para><ulink url="http://www.antlr.org">ANTLR</ulink></para>
+</listitem>
+</itemizedlist>
+
+<para>
+The following tools are useful to compile separate parsers.  You do not need them
+if you have binaries.
+</para>
+
+<itemizedlist mark="bullet">
+<listitem>
+  <para>
+  A good C++ compiler.  GCC 3.2 or later is recommended strongly, because pre-3.0 versions of GCC
+  do not deal with some C++ code correctly (such as templates).  GCC "2.96" (a.k.a. RedHat GCC)
+  particularly should <emphasis>never</emphasis> be used.
+  </para>
+</listitem>
+<listitem>
+  <para>
+  GNU Bison 1.875a or later.  yacc will not work because the C++ parser relies on the new GLR features of Bison.
+  </para>
+</listitem>
+<listitem>
+  <para>
+  GNU Flex 2.5 or later.  Earlier versions of flex or lex may work but have not been tested.
+  </para>
+</listitem>
+</itemizedlist>
+
+<para>
+Makefile in the cetus directory controls compilation of Cetus IR. Users need to
+pass the location of the antlr.jar file as a parameter to the make command:
+<command>make antlr=(location of antlr.jar)</command>
+</para>
+</chapter>
+
+<chapter id="Installation">
+<title>Installation</title>
+
+<para>
+Currently you must place all JAR files, binaries, and libraries into the same directory, after
+obtaining them separately.  There should be a better installation process later.
+</para>
+</chapter>
+
+<chapter id="Running-Cetus">
+<title>Running Cetus</title>
+
+  <sect1>
+   <title>Quick Start</title>
+
+   <orderedlist numeration="arabic">
+    <listitem>
+     <para>
+Make sure all JAR files are in the SAME DIRECTORY.
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+[Perform this step if you are using the external parser.]
+     </para>
+
+     <para>
+Make sure parser and libcompdev.so.0 are in the SAME DIRECTORY
+   as the JAR files.
+     </para>
+</listitem>
+    <listitem>
+     <para>
+[Perform this step if you are using the external parser.]
+     </para>
+
+     <para>
+Set LD_LIBRARY_PATH variable to the current directory.  E.g.
+     </para>
+
+     <para>
+export LD_LIBRARY_PATH=.     (for sh, bash)
+     </para>
+
+     <para>
+setenv LD_LIBRARY_PATH .     (for csh)
+     </para>
+</listitem>
+    <listitem>
+     <para>
+Set your CLASSPATH variable to include the JAR files.  E.g.
+     </para>
+     <para>
+export CLASSPATH=cetus.jar:antlr.jar     (for sh, bash)
+     </para>
+
+     <para>
+setenv CLASSPATH cetus.jar:antlr.jar     (for csh)
+     </para>
+</listitem>
+    <listitem>
+     <para>
+Execute Cetus
+     </para>
+
+     <para>
+java cetus.exec.Driver [options] [files]
+     </para></listitem></orderedlist>     </sect1>
+
+<sect1>
+   <title>Command Line Options</title>
+
+<itemizedlist mark="bullet">
+
+  <listitem>
+    <para><command>-antlr</command></para>
+    <para>Use Antlr Parser for C</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-callgraph</command></para>
+    <para>Print the static call graph to stdout</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-cfg</command></para>
+    <para>Print the control-flow graph to stdout</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-echo</command></para>
+    <para>Echo source code to stdout as it is processed</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-expand-user-header</command></para>
+    <para>Expand user (non-standard) header files</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-help</command></para>
+    <para>Prints this message</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-outdir=dirname</command></para>
+    <para>Sets the output directory (default is cetus_output)</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-parse-only</command></para>
+    <para>Stop after parsing; do not analyze or optimize</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-preprocessor=command</command></para>
+    <para>Set the preprocessor to use</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-procs=N</command></para>
+    <para>(Currently Disabled) Set the number of processors for parallel parsing</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-tloops-to-subroutines</command></para>
+    <para>Extract all loops into subroutines</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-tsingle-call</command></para>
+    <para>Transform all statements so they contain at most one function call</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-tsingle-declarator</command></para>
+    <para>Transform all variable declarations so they contain at most one declarator</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-tsingle-return</command></para>
+    <para>Transform all procedures so they have a single return statement</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-usage</command></para>
+    <para>Prints this message</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-verbosity=N</command></para>
+    <para>Degree of status messages (0-4) that you wish to see (default is 0)</para>
+  </listitem>
+
+  <listitem>
+    <para><command>-version</command></para>
+    <para>Print the version information</para>
+  </listitem>
+
+</itemizedlist>
+</sect1></chapter>
+
+<chapter id="Architecture-of-Cetus">
+<title>Architecture of Cetus</title>
+
+<sect1 id="Background">
+<title>Background</title>
+
+<para>
+From a substantial list of compiler infrastructures, we choose to discuss
+three open-source projects that most closely match our goals. The goals are to create a
+source-to-source infrastructure that supports C and is extensible to other
+languages. The three projects are the GNU, Polaris, and SUIF compilers.
+We explain our reasons for not using these infrastructures as our basis,
+and also discuss important features of these compilers that we want to adopt in Cetus.
+</para>
+
+<sect2>
+<title>GCC</title>
+
+<para>
+GCC is one of the most robust compiler infrastructures
+available to the research community.  GCC generates highly-optimized code for a
+variety of architectures, which rivals in many cases the quality generated by
+the machine vendor's compiler.  Its open-source distribution and continuous
+updates make it attractive. However, GCC was not designed for source-to-source
+transformations. Most of its passes operate on the lower-level RTL
+representation. Only recent versions of GCC (version 3.0 onward) include an
+actual syntax tree representation, which has been used in Purdue 
+class projects for implementing a number of compiler passes.  Other limitations are
+GCC compiles one source file at a time, performs separate analysis of
+procedures, and requires extensive modification to support interprocedural
+analysis across multiple files.
+</para>
+
+<para>
+The most difficult problem faced by the students was that GCC does
+not provide a friendly API for pass writers. The API consists largely of
+macros. Passes need to be written in C and operations lack logical grouping
+(classes, namespaces, etc), as would be expected from a compiler
+developed in an object-oriented language.
+</para>
+
+<para>
+GCC's IR has an ad-hoc type system, which is not reflected in its
+implementation language (C). The type system is encoded into integers that must be
+decoded and manipulated by applying a series of macros.  It is
+difficult to determine the purpose of fields in the IR from looking at the
+source code, since in general every field is represented by the same type. This
+also makes it difficult for debuggers to provide meaningful information to
+the user.
+</para>
+
+<para>
+Documentation for GCC is abundant. The difficulty is that the sheer amount
+easily overwhelms the user.
+Generally, we have found that there is a very steep learning curve in
+modifying GCC, with a big time investment to implement even trivial transformations.
+</para>
+
+<para>
+The above difficulties were considered primarily responsible for
+the students that used GCC proceeding more slowly than those creating
+a new compiler design. The demonstrated higher efficiency of implementation was
+the ultimate reason for the decision to pursue the full design of Cetus.
+</para>
+</sect2>
+
+<sect2>
+<title>Polaris</title>
+
+<para>
+The Polaris compiler, which we have co-developed in
+prior work, was an important influence on the design of our new
+infrastructure. Polaris is written in C++ and operates on Fortran 77
+programs. So far, no extensions have been made to handle Fortran 90, which
+provides a user-defined type system and other modern programming language
+features. Polaris' IR is Fortran-oriented and extending
+it to other languages would require substantial modification.
+</para>
+
+<para>
+Another factor we considered
+was that Polaris was written before the Standard Template Library
+(C++ STL) became available, so it includes its own container implementations.
+It uses a pre-ISO dialect of C++ which now seems unusual to programmers and
+causes many warnings (and sometimes errors) with current compilers. Both
+aspects limit its portability to other platforms.
+</para>
+
+<para>
+In general, Polaris is representative of compilers that are designed for one
+particular language, serve their purpose well, but are difficult to extend.
+Cetus should not be thought of as "Polaris for C" because it is designed to
+avoid that problem.  However, there are still several Polaris features that we
+wanted to adopt in Cetus.  Polaris' IR can be printed in the form of code that
+is similar to the source program. This property makes it easy for a user to
+review and understand the steps involved in Polaris-generated
+transformations. Also, Polaris' API is such that the IR is in a consistent
+state after each call. Common mistakes that pass writers make can be
+avoided in this way.
+</para>
+</sect2>
+
+<sect2>
+<title>SUIF</title>
+
+<para>
+The SUIF compiler is part of the National Compiler Infrastructure (NCI),
+along with Zephyr, whose design began almost a decade ago. The infrastructure was intended as a
+general compiler framework for multiple languages.  It is written in C++, like Polaris, and the
+currently available version supports analysis of C programs.  SUIF 1 is a parallelizing compiler
+and SUIF 2 performs interprocedural analysis.
+</para>
+
+<para>
+Both SUIF and Cetus fall into the category of extensible source-to-source
+compilers, so at first SUIF looked like the natural choice for our
+infrastructure.  Three main reasons eliminated our pursuit of this option.  The
+first was the perception that the project is no longer active - the last major
+release was in 2001 and does not appear to have been updated recently.
+The second reason was,
+although SUIF intends to support multiple languages, we could not find complete front
+ends other than for C and an old version of Java. Work began on front ends for
+Fortran and C++, but they are
+not available in the current release. Hence, as is, SUIF essentially supports a single
+language, C. Finally, we had a strong preference for using Java as the compiler
+implementation language. Java offers several features conducive to good
+software engineering.  It provides good debugging support, high portability,
+garbage collection (contributing to the ease of writing passes), and its own
+automatic documentation system. These facts prompted us to pursue other
+compiler infrastructures.
+</para>
+</sect2></sect1>
+
+<sect1 id="Front-End">
+<title>Front End</title>
+
+<sect2> <title>Integrated Parsers</title>
+<para>
+Cetus is written in Java, so it is natural to use ANTLR to generate parsers
+whenever possible.  Cetus comes with an ANTLR parser for C.  We determined that
+ANTLR cannot be used for C++.  We are aware that there is a C++ grammar on the
+ANTLR website, but it is incomplete and we wanted a grammar that matched the
+standard grammar in Stroustrup's book as much as possible.
+</para>
+</sect2>
+
+<sect2> <title>Separate Parsers</title>
+<para>
+Parsing intentionally was separated from the IR-building methods in the high-level interface so that
+other front ends could be added independently.  Some front ends may require more effort than others.
+For example, writing a parser for C++ is a challenge because its
+grammar does not fit easily into any of the grammar classes supported by standard generators.
+The GNU C++ compiler was able to use an LALR(1) grammar, but it looks nothing
+like the ISO C++ grammar.  If any rules must be rearranged to add actions in a particular location,
+it must be done with extreme care to avoid breaking the grammar.  Another problem is C++ has
+much more complicated rules than C as far as determining which symbols are identifiers versus type names,
+requiring substantial symbol table maintenance while parsing.
+</para>
+
+<sect3> <title>C</title>
+<para>
+The C language was the original focus of the Cetus project.
+</para>
+
+<sect4> <title>Scanner</title>
+<para>
+There is nothing unusual about the C scanner.  It is made with flex, and directly follows the ANSI C standard.
+It accepts a few GCC-specific keywords, as well as the C99 <varname>restrict</varname> keyword.
+</para>
+</sect4>
+
+<sect4> <title>Parser</title>
+<para>
+The C parser is made using GNU Bison.  C is easier to parse than C++.  To parse C, the only context-sensitive
+decision is whether or not an identifier is the name of a type.  Thus, full symbol table information
+is unnecessary.  The C grammer is compatible with LALR(1) tools.
+</para>
+</sect4>
+</sect3>
+
+<sect3> <title>C++</title>
+<para>
+C++ was the primary reason for allowing separate parsers, as discussed above.
+</para>
+
+<sect4> <title>Scanner</title>
+<para>
+Even the C++ scanner is difficult.  The <command>&lt;</command> token can mean either
+<wordasword>less than</wordasword> or begin a template specification.  Without complete
+symbol table information, it is not possible to perfectly disambiguate between the
+two cases.  However, building complete symbol table information in the C++ parser and feeding it back to the
+scanner defeats the purpose of having a separate parser, because actions become large and the grammar may need
+modified to provide places for new actions.  Modifying the C++ grammar is no easy task.
+</para>
+
+<para>
+There is a heuristic in the scanner for performing the disambiguation.  When it encounters
+a <command>&lt;</command>, it saves the state of the scanner, and then looks at subsequent
+tokens until it can decide which token the <command>&lt;</command> is.
+The lookahead is bounded and will terminate with an error message if it exceeds the bounds.
+After the appropriate token has been chosen, the state of the scanner is restored and the
+token is returned to the parser.  The heuristic works correctly for the C++ template library,
+but it could always be improved.
+</para>
+</sect4>
+
+<sect4> <title>Parser</title>
+<para>
+We are extending Cetus for C++ by using a Generalized LR (GLR, also called stack-forking or Tomita parsing)
+parser generator.  Such parsers allow grammars that accept any language and defer
+semantic analysis to a later pass.  GLR support has recently been added to GNU Bison and
+provides a way to create a C++ parser that accepts the entire language without using a
+symbol table.  An important benefit is the grammar can be kept very close to the ISO grammar.
+We have developed a parser for the complete C++ language plus some GCC extensions using Bison.
+We believe it is due to the language's complexity that there are fewer research papers dealing
+with C++ than with other languages, despite C++'s wide use in industry.
+The above reasons should allow Cetus to provide an easy-to-use C++ infrastructure, making it a
+very important research tool.
+</para>
+</sect4>
+</sect3>
+</sect2>
+
+<sect2> <title>Parse Tree File Format</title>
+<para>
+The output of either the C parser or C++ parser is a parse tree file.  The parse tree file is compatible with
+the <ulink url="http://www.graphviz.org">graphviz</ulink> package.
+It is possible to visualize the parse trees using <varname>graphviz</varname>, but only for small
+programs.  Parse trees become unmanageably large for programs of more than a few hundred lines,
+however <varname>graphviz</varname> was useful for verifying
+the parser worked correctly by examining parse trees for small chunks of code.
+</para>
+</sect2>
+
+<sect2>
+<title>Saving Line Numbers, Pragmas, and Comments</title>
+<para></para>
+</sect2>
+
+<sect2>
+<title>Tree Walker Generator</title>
+<para></para>
+</sect2>
+
+<sect2>
+<title>Tree Walker</title>
+<para></para>
+</sect2>
+
+<sect2>
+<title>Parse Tree Disambiguation</title>
+<para></para>
+</sect2>
+</sect1>
+
+<sect1 id="Intermediate-Representation">
+<title>Intermediate Representation</title>
+
+<para>
+Cetus' IR contrasts with the Polaris Fortran translator's IR in that it uses a
+hierarchical statement structure. The Cetus IR directly reflects the block
+structure of a program. Polaris lists the statements of each procedure in a
+flat way, with a reference to the outer statement being the only way
+for determining the block structure. There are also important differences in
+the representation of expressions, which further reflects the differences
+between C and Fortran. The Polaris IR includes assignment statements,
+whereas Cetus represents assignments in the form of expressions. This
+corresponds to the C language's feature to include assignment side effects
+in any expression.
+</para>
+
+<para>
+The IR is structured such that the original source program can be reproduced,
+but this is where source-to-source translators face an intrinsic dilemma.
+Keeping the IR and output similar to the input will make it easy for the user to recognize
+the transformations applied by the compiler. On the other hand, keeping
+the IR language independent leads to a simpler compiler architecture,
+but may make it impossible to reproduce the original source code as output.
+In Cetus, the concept of statements and expressions are closely related to the
+syntax of the C language, facilitating easy source-to-source translation.
+However, the drawback is increased complexity for pass writers (since they
+must think in terms of C syntax) and limited extensibility of Cetus to additional languages.
+That problem is mitigated by the provision of several abstract classes,
+which represent generic control constructs. Generic passes can then be written
+using the abstract interface, while more language-specific passes can
+use the derived classes.  We feel it is important to work with multiple languages
+at an early stage, so that our result is not simply a design that is extensible
+in theory but also in practice.  Toward this goal, we have begun adding a C++
+front end and generalizing the IR so that we can evaluate these design trade-offs.
+Other potential front ends are Java and Fortran 90.
+</para>
+
+<sect2> <title>Class Hierarchy Design</title>
+<para>
+Our design goal was a simple IR class hierarchy easily understood by
+users. It should also be easy to maintain, while being rich enough to
+enable future extension without major modification.  The basic building blocks
+of a program are the translation units, which represent the content of a
+source file, and procedures, which represent individual
+functions. Procedures include a list of simple or compound statements,
+representing the program control flow in a hierarchical way. That is, compound
+statements, such as IF-constructs and FOR-loops include inner
+(simple or compound) statements, representing then and else blocks or loop bodies,
+respectively. Expressions represent the operations being done on
+variables, including the assignments to variables.
+</para>
+
+<sect3> <title>Relationship Between Grammar and IR</title>
+<para>
+When designing any class hierarchy, some general principles are followed.  The main
+principle is that a derived class satisifies an <wordasword>is a</wordasword> relationship with its parent,
+such that the data and methods of the parent make sense in the context of the child.
+This principle is followed to some extent in Cetus, but it would be more accurate to say
+that a derived class can appear in the grammar wherever its parent can appear.
+For example, AccessLevel and Annotation are derived from Declaration, however neither of
+them can be used to declare new symbols.  They are children simply because they may
+appear in the same location in the grammar (for AccessLevel) or in the IR
+(for Annotation) as their parent.
+</para>
+
+<para>
+There is a distinction between the class hierarchy and the syntax tree.  For example,
+in the syntax tree, the parent of a TranslationUnit is a Program, however neither TranslationUnit
+nor Program have a parent in the class hierarchy.
+</para>
+</sect3>
+
+<sect3> <title>Syntax Tree Invariants</title>
+<para>
+One important aspect that makes an infrastructure useful is providing a good set of tools
+to help debug future compiler passes.  Cetus provides
+basic debugging support through the Java language, which contains exceptions
+and assertions as built-in features.
+Cetus executes within a Java virtual machine, so a full stack trace including source line
+numbers is available whenever an exception is caught or the compiler terminates abnormally.
+</para>
+
+<para>
+Such error reporting is useless unless the IR is designed to prevent programmers
+from corrupting the program representation.
+In other words, there must be a way of detecting the state of the IR is not as
+it should be, in order to report an error.
+To provide error checking and detect common errors by pass writers, the Cetus IR maintains several invariants.
+Violating one of the invariants below will <wordasword>probably</wordasword> result in
+an exception, to the extent that it is possible for Cetus to recognize what you have done.
+</para>
+
+<para>
+Invariant
+     </para>
+
+     <orderedlist numeration="arabic">
+      <listitem>
+       <para>
+If an object has a parent, then it has exactly one parent.
+       </para></listitem></orderedlist>
+     <para>
+Consequences
+     </para>
+
+     <itemizedlist mark="bullet">
+      <listitem>
+       <para>
+You may not take an object that has a parent and add it as the child of another object.
+       </para></listitem>
+      <listitem>
+       <para>
+If you want to use the same object in more than one place in the syntax tree, you must clone the original object.
+       </para></listitem>
+      <listitem>
+       <para>
+Clones are identical to the originals except their parent is null.
+       </para></listitem></itemizedlist>
+     <para>
+Invariant
+     </para>
+
+     <orderedlist continuation="continues" numeration="arabic">
+      <listitem>
+       <para>
+An object <varname>P</varname> can enumerate all of its children.
+       </para></listitem></orderedlist>
+     <para>
+Consequences
+     </para>
+
+     <itemizedlist mark="bullet">
+      <listitem>
+       <para>
+An iterator object can be created with <varname>P</varname> that can iterate over <varname>P</varname>'s children.
+In some cases, the iterator will not visit data that is actually part of <varname>P</varname> itself.
+Nearly everything is kept in the list of children, and we may more move data into the list in the future. 
+       </para></listitem></itemizedlist>
+     <para>
+Invariant
+     </para>
+
+     <orderedlist continuation="continues" numeration="arabic">
+      <listitem>
+       <para>
+An object <varname>P</varname> controls the addition and removal of its children.
+       </para></listitem></orderedlist>
+     <para>
+Consequences
+     </para>
+
+     <itemizedlist mark="bullet">
+      <listitem>
+       <para>
+An object <varname>C</varname> cannot become the child of an object <varname>P</varname> without <varname>P</varname>'s permission.
+       </para></listitem>
+      <listitem>
+       <para>
+Before an object <varname>C</varname> can set its parent reference to an object <varname>P</varname>, <varname>P</varname> must already recognize <varname>C</varname> is a child.  I.e. <varname>C</varname> must already be in the list of <varname>P</varname>'s children.
+       </para></listitem>
+      <listitem>
+       <para>
+The child reference and parent reference (i.e. downlink and uplink) must be set in that order.  The <varname>addXYZ</varname>
+  methods of many classes will take care of this for you.  There are also atomic swap methods that respect the ordering.
+       </para></listitem></itemizedlist>   </sect3></sect2>
+
+   <sect2>
+    <title>Major Classes</title>
+
+    <para>
+All of the classes are documented in detail with javadoc.  That documentation can be found
+at http://www.ece.purdue.edu/ParaMount/Cetus/docs/.
+    </para>
+
+    <para>
+A brief discussion of important base classes is below.
+    </para>
+
+    <sect3>
+     <title>Program
+</title>
+
+     <para>
+A Program object represents the entire program.  It is the root of the syntax tree.
+     </para>
+</sect3>
+    <sect3>
+     <title>TranslationUnit
+</title>
+
+     <para>
+A TranslationUnit represents a single source file.  It may only appear as the immediate child
+of the Program.
+     </para>
+</sect3>
+    <sect3>
+     <title>Declarations
+</title>
+
+     <para>
+Declarations appear in many places.  As children of TranslationUnit, they represent global
+declarations of variables, functions, or classes.  As parameters of a Procedure, they
+represent declarations of formal parameters.  As children of ClassDeclaration, they represent
+methods and data members.
+     </para>
+</sect3>
+
+    <sect3>
+     <title>Expressions
+</title>
+
+     <para>
+Expressions are normally of most interest to optimization passes.  All assignments, function calls, and mathematical
+computations are Expressions.
+     </para>
+</sect3>
+    <sect3>
+     <title>Statements
+</title>
+
+     <para>
+Statements serve two purposes: to provide control constructs, and to provide wrappers for Declarations
+and Expressions.  Statements such as IfStatement provide a control construct, whereas DeclarationStatement
+and ExpressionStatement simply allow Declarations and Expressions to appear wherever a Statement may appear.
+     </para>
+</sect3>
+    <sect3>
+     <title>Specifiers
+</title>
+
+     <para>
+Specifiers are most often found in lists.  For example, a variable declaration may be prefixed with
+a list of specifiers such as <varname>const</varname> and <varname>float</varname>.
+     </para>
+
+</sect3></sect2></sect1>
+  <sect1 id="Back-End">
+   <title>Back End
+</title>
+
+   <para>
+Cetus does not contain a code generator.  It is a source-to-source compiler, and so it
+relies on other compilers (such as GCC or the Sun compiler) to compile the source code
+it outputs.  It is possible that in the future a back end could be added to Cetus,
+but for research purposes other compilers are more suited to back end optimization work.
+   </para>
+</sect1>
+</chapter>
+
+<chapter id="Writing-a-Pass">
+<title>Writing a Pass</title>
+
+<para>
+The following sections discuss the interface Cetus provides to pass writers.
+</para>
+
+<sect1>
+<title>Making Cetus Execute Your Pass</title>
+
+<para>There are two ways to extend Cetus to run a new pass.</para>
+
+<orderedlist numeration="arabic">
+<listitem>
+<para>
+For passes accepted into the main Cetus distribution, provide a static void <command>run</command> method
+that accepts a <command>Program</command> object as its only parameter.  We will add a flag
+to Cetus, named similarly to your pass, that will cause the Cetus driver to call your pass.
+</para>
+</listitem>
+
+<listitem>
+<para>
+Derive a class from cetus.exec.Driver and override the <command>runPasses</command> method.
+You must provide your own <command>main</command> method, which should contain a single line:
+<screen>
+public class MyDriver extends Driver
+{
+  // ...
+
+  public static void main(String[] args)
+  {
+    (new MyDriver()).run(args);
+  }
+}
+</screen>
+where <command>args</command> is simply the command line argument of your <command>main</command> method.
+You can optionally override the <command>printUsage</command> and <command>printHelp</command>
+methods if your pass has additional command-line options.  The Driver class contains a
+protected <command>Program</command> object that your derived class will be able to access in
+its <command>runPasses</command> method.  Note that the <command>run</command> method called in the example
+above is the <command>run</command> method of the Driver class.  It will process command-line arguments,
+run the parsers, and get everything ready for your code before calling <command>runPasses</command>.
+</para>
+</listitem>
+</orderedlist>
+</sect1>
+
+
+<sect1>
+<title>Iterators</title>
+
+<para>
+The IRIterator class implements the Java Iterator interface plus some added functionality.
+The BreadthFirstIterator and DepthFirstIterator iterate over the IR in breadth-first
+and depth-first order, respectively.  The FlatIterator simply iterates over an object's
+children, and does not perform a "deep" traversal within the children.  An IRIterator can
+be made to skip objects such that it only returns objects of certain types.  It can also
+be made to prune parts of the traversal below objects of certain types.
+</para>
+
+<para>
+IRIterators provide several versions of <command>next</command> that are explained in the examples below.
+The first example shows how to use the standard <command>next</command>:
+</para>
+
+<para>
+<screen>
+/* BreadthFirst traversal over everything in a procedure. Assumes proc is a Procedure object. */
+
+BreadthFirstIterator iter = new BreadthFirstIterator(proc);
+while (iter.hasNext())
+{
+  Object o = iter.next();
+  // Do something with the object
+}
+</screen>
+</para>
+
+<para>
+The next example shows how to locate a particular type of object:
+</para>
+
+<para>
+<screen>
+/* Look for loops in a procedure.  Assumes proc is a Procedure object. */
+
+BreadthFirstIterator iter = new BreadthFirstIterator(proc);
+try {
+  while (true)
+  {
+    Loop loop = (Loop)iter.next(Loop.class);
+    // Do something with the loop
+  }
+} catch (NoSuchElementException e) {
+}
+</screen>
+</para>
+
+<para>
+Note the exception handling.  <command>next</command> must throw an exception if it cannot find an element
+of the specified class, because the corresponding <command>hasNext</command> method cannot be implemented.  The
+reason is the iterator would have to actually perform the iteration to determine if there was such a next element,
+and if true, would need to perform the iteration again to actually return the object.  The standard <command>hasNext</command>
+does not have have this problem because it simply checks if it has reached the end of the list.
+We think it would be very strange for users if we provided a <command>hasNext</command> method that modified
+the iterator, and it would be awkward for us to write a <command>hasNext</command> that would look ahead and then
+undo its changes.  Furthermore, that version of <command>hasNext</command> would no longer be a &Theta;(1) call,
+so we chose not to provide it.
+</para>
+
+<para>
+Other versions of <command>next</command> will find an element of a set of classes, or an element that is not of a set of classes.
+</para>
+
+<para>
+The next example shows how to use pruning:
+</para>
+
+<para>
+<screen>
+/* Look for procedures in a program.  Assumes prog is a Program object. */
+
+BreadthFirstIterator iter = new BreadthFirstIterator(prog);
+iter.pruneOn(Procedure.class);
+
+try {
+  while (true)
+  {
+    Procedure proc = (Procedure)iter.next(Procedure.class);
+    // Do something with the procedure 
+  }
+} catch (NoSuchElementException e) {
+}
+</screen>
+</para>
+
+<para>
+Instead of obtaining one iterator on the Program object to look for TranslationUnits, and
+then obtaining another iterator on each TranslationUnit to look for Procedures, it is
+easier to do a breadth first search on the entire Program.  However, it does not make much
+sense to look for Procedures inside other Procedures, since none of the languages supported
+by Cetus allow nested Procedures.  Therefore, <command>pruneOn</command> tells the iterator
+to skip anything below a Procedure on the IR tree.
+</para>
+
+</sect1>
+
+<sect1>
+<title>Tools</title>
+
+<para>
+The Tools class is a group of static methods for performing common operations, such as printing lists.
+</para>
+</sect1>
+
+<sect1>
+<title>Expression Simplifier</title>
+
+<para>
+The expression simplifier provides a very important service to pass writers.  Our experience with the class project showed
+that source-to-source transformations implemented within GCC often resulted in large, unreadable expressions.  GCC does not
+provide a symbolic expression simplifier and the students determined it would not be easy to add one given the problems
+we have mentioned with GCC's IR.  The Cetus API, however, made it possible to add a powerful expression simplifier with a modest effort. While it is not as powerful as the simplifiers provided by math packages, such as Maple, Matlab, or Mathematica, it
+does reduce the expressions to a canonical form and has been able to eliminate the redundancy in the expressions we have encountered
+in our experiments.  Expression simplification enhances the readability of the compiler output and enables other
+optimizations because it transforms the program into a canonical form.  For instance, idiom recognition and induction variable
+substitution benefited most from the expression simplifier.
+Recognition is easier because there are fewer complicated expressions to analyze and all expressions have a consistent structure.
+Substitution can create very long expressions that make later passes less effective unless it is
+immediately followed by simplification.
+</para>
+
+<para>
+To use the expression simplifier, you first create a Simplifier object, then you call its <varname>run</varname> method on an expression.
+The Simplifier will not modify the original expression, and instead returns a new, simplified expression.
+</para>
+
+<para>
+<screen>
+/* The following code prints 13. */
+
+BinaryExpression a = new BinaryExpression(new IntegerLiteral(3), BinaryOperator.ADD, new IntegerLiteral(4));
+BinaryExpression bexpr = new BinaryExpression(a, BinaryOperator.ADD, new IntegerLiteral(6));
+
+(new Simplifier()).run(bexpr).print(System.out);
+</screen>
+</para>
+
+<para>
+The Simplifier constructor has some parameters that determine how it should simplify the expression.  From experience with
+the class project, we found that some passes require certain forms of simplification that are not appropriate for other passes.
+For example, some people are reluctant to simplify floating point expressions because they may no longer have the exact value
+of the original expression.
+</para>
+
+<para>
+The different parameters to the Simplifier will be documented here after they are finalized.
+</para>
+</sect1>
+
+<sect1>
+<title>Modifying IR</title>
+<para></para>
+</sect1>
+
+<sect1>
+<title>Printing</title>
+
+<para>
+A major complaint about early versions of Cetus was that the printing of IR was not flexible enough.  To solve this problem,
+we have made printing completely customizable by the pass writer.
+Nearly all classes implement a <varname>Printable</varname> interface, which means they provide
+a <varname>print</varname> method for printing themselves as source code.  By default, this <varname>print</varname> method
+calls a static method of the same class, called <varname>defaultPrint</varname>.  The call is made by invoking a
+Java <varname>Method</varname> object, which is similar to a function pointer in C.  The <varname>Method</varname> object
+can be changed by calling <varname>setPrintMethod</varname> and passing it a different printing routine.
+<varname>setPrintMethod</varname> allows a pass writer to change how one particular object prints itself.  If the pass
+writer notices that they are calling this method frequently for the same type of object, then it may be easier to call
+<varname>setClassPrintMethod</varname>, a static method which causes all newly created objects of a particular class to
+use the provided printing routine.
+</para>
+
+</sect1>
+</chapter>
+
+<chapter id="Optimization-and-Analysis-Passes">
+<title>Optimization and Analysis Passes</title>
+
+<sect1>
+<title>Data Dependence Analysis</title>
+<para></para>
+</sect1>
+
+<sect1>
+<title>Induction Variable Recognition and Substitution</title>
+<para></para>
+</sect1>
+
+<sect1>
+<title>Reduction Variable Recognition</title>
+<para></para>
+</sect1>
+
+<sect1>
+<title>Privatization</title>
+<para></para>
+</sect1>
+
+<sect1>
+<title>Pointer Alias Analysis</title>
+<para></para>
+</sect1>
+
+<sect1>
+<title>OpenMP</title>
+
+   <para>
+Compiler functionality for supporting translation of OpenMP falls
+into two broad categories. The first category deals with the translation
+of the OpenMP work sharing constructs to the micro-tasking format. This
+entails the extraction of the work sharing code to separate microtasking
+subroutines and insertion of the corresponding function calls and
+synchronization. Cetus provides an API sufficient for these transformations.
+The second category deals with the translation of the data clauses, which
+requires support for accessing and modifying symbol table entries.
+Cetus provides several ways in which the pass writer can access
+the symbol table to add and delete symbols or change their scope.
+   </para>
+
+   <para>
+There are currently two different OpenMP translators which have
+been implemented using Cetus. Both of these use the same OpenMP front
+end. One translator generates code for shared-memory systems using the
+POSIX threads API. The other translator targets software distributed shared
+memory systems and was developed as part of a project to extend OpenMP
+to cluster systems. Although the entire OpenMP 2.0
+specification is not supported yet, the translators are powerful enough
+to handle benchmarks such as 330.art_m and 320.equake_m from the SPEC
+OMPM2001 suite.
+   </para>
+
+</sect1>
+</chapter>
+
+<chapter id="Examples">
+<title>Examples</title>
+<para></para>
+</chapter>
+
+<chapter id="Glossary">
+<title>Glossary</title>
+<para></para>
+</chapter>
+
+
+<index id="Index">
+<title>Index</title>
+</index>
+
+</book>

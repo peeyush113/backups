@@ -1,0 +1,33 @@
+These are the names of people who have contributed to Cetus,
+along with the list of packages for which they are primarily
+responsible. 
+
+Chirag Dave (cdave@purdue.edu)
+  - primary maintenance
+  - bug-fixes
+  - website support
+
+Hansang Bae (baeh@purdue.edu)
+
+Leonardo Bachega (lbachega@purdue.edu)
+  - Maintenance and support
+  - Feedback System Implementation
+
+Troy A. Johnson (tajohnson@ieee.org)
+  - analysis: DataFlow
+  - exec
+  - hir
+  - manual
+  - transforms: SingleCall, SingleDeclarator, SingleReturn,
+                LoopsToSubroutines
+  - treewalk: DagParser
+
+Sang-Ik Lee (sangik@ecn.purdue.edu)
+  - base (Antlr C parser)
+  - hir
+
+Long Fei (lfei@ecn.purdue.edu)
+  - treewalk
+
+Ayon Basumallik (basumall@ecn.purdue.edu)
+  - analysis: DataFlow, CallGraph, ControlFlowGraph

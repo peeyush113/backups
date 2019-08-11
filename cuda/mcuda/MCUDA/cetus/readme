@@ -1,0 +1,99 @@
+Cetus 0.5.1 (November 6, 2007)
+
+Cetus is a source-to-source compiler infrastructure written in Java. We
+currently support ANSI C transformation and support for C++ is currently under
+development.
+
+
+FEATURES
+---------
+Cetus 0.5.1 has the following updated features:
+
+For Users:
+* New and improved website interface for our users
+* Web-based feedback and bug reporting via Bugzilla
+* Cetus mailing lists for better exchange of 
+  Cetus-related information
+
+Source-related:
+* Cetus is now being regression tested using the 
+  SPEC2006 CPU benchmarks and a few related bug-fixes
+  have been incorporated in this release.
+* Support for C99 datatypes _Bool, _Complex, and
+  _Imaginary
+* Current interface to symbol table is under revision and
+  will be improved for the next release, while still
+  supporting the old interface
+
+
+REQUIREMENTS
+-------------
+* Java 2 SDK, SE 1.5.0 (or later)    (Required)
+* ANTLRv2 2.7.5        (or later)    (Required)
+* Bash                               (Required)
+
+
+INSTALLATION
+-------------
+* Obtain Cetus distribution
+  The latest version of Cetus can be obtained at:
+  http://cetus.ecn.purdue.edu/
+
+* Unpack
+  Users need to unpack the distribution before installing Cetus.
+  $ cd <directory_where_cetus.tar.gz_exists>
+  $ gzip -d cetus.tar.gz | tar xvf -
+
+* Build
+  The Makefile in the "cetus" directory controls the compilation of Cetus.
+  It is important to let Makefile know the location of ANTLR runtime binary.
+  $ cd cetus
+  $ make antlr=<directory_where_antlr.jar_exists>
+
+
+LIMITATIONS
+------------
+The following bugs are currently under review and have not been
+fixed for release 0.5.1. The affected SPEC2006 CPU benchmarks
+are mentioned for reference.
+
+* Currently, Cetus does not support the passing of variable
+  types as parameters to a function call.
+  e.g.
+  va_arg(temp, int);
+  
+  The above function is a built-in GCC function that accepts
+  variable types as parameters.
+
+  Affected benchmarks: 400.perlbench
+                       445.gobmk
+                       462.libquantum
+
+* Currently, Cetus does not support the C99 operator
+  __alignof__ which accepts a variable type or an expression
+  as its operand.
+
+  Affected benchmarks: 403.gcc
+
+* Currently, Cetus does not support the simultaneous usage of 
+  ANSI C and K&R C function declaration formats within the 
+  same source file.
+  e.g.
+  void temp_func(int a, int b);
+  ....
+  ....
+  void temp_func()
+    int a;
+    int b;
+  {
+  ....
+  }
+
+  Affected benchmarks: 456.hmmer (hsregex.c)
+
+
+November 6, 2007
+The Cetus Team
+
+URL: http://cetus.ecn.purdue.edu/
+EMAIL: cetus@ecn.purdue.edu

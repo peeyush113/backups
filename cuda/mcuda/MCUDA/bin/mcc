@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# (c) 2008 The Board of Trustees of the University of Illinois.
+
+MCUDA_DEFINES="-D__DEVICE_EMULATION__ -D__MCUDA__"
+INCLUDE_FLAGS="-IMCUDA_DIR/include -ICUDA_INSTALL_DIR/include/ -I."
+CLASSPATH=MCUDA_DIR/bin/cetus.jar:MCUDA_DIR/bin/antlr.jar
+export CLASSPATH;
+OPT="";
+COMPILER_FLAGS="";
+
+Version() {
+  echo "mcc version 1.0.1";
+  echo "This installation:";
+  echo "Linked to CUDA installation at CUDA_INSTALL_DIR";
+  echo "Configured with LIB_TYPE parallel libraries";
+  echo "Configured with USR_CC as the final source compiler";
+}
+
+Usage() {
+  echo "Usage: mcc <file> [-preproc-options \"\"] [-Xcompiler \"\"] [mcuda-options]";
+  echo "mcc --version for more information";
+  exit 1;
+}
+
+if [ $# -lt 1 ] ; then
+  Usage;
+fi
+
+if [ ! -f $1 ] ; then
+  if [ $1 == --version ] ; then
+    Version;
+    exit 0;
+  else
+    Usage;
+  fi
+fi
+
+ARG=$1
+shift
+
+if [ $# -ge 1 ] ; then
+  if [ $1 == -preproc-options ] ; then
+    shift;
+    if [ $# -lt 1 ] ; then
+      Usage;
+    else
+      OPT=$1;
+      shift;
+    fi
+  fi
+fi
+
+if [ $# -ge 1 ] ; then
+  if [ $1 == -Xcompiler ] ; then
+    shift;
+    if [ $# -lt 1 ] ; then
+      Usage;
+    else
+      COMPILER_FLAGS=$1;
+      shift;
+    fi
+  fi
+fi
+
+java cetus.exec.DriverMCUDA -antlr $@ -expand-user-header \
+  -outdir=mcuda_output \
+  -preprocessor="gcc -x c -E $MCUDA_DEFINES $INCLUDE_FLAGS $OPT" $ARG
+
+USR_CC -x c mcuda_output/$ARG $COMPILER_FLAGS

@@ -1,0 +1,123 @@
+(c) 2008 The Board of Trustees of the University of Illinois.
+
+MCUDA: CUDA compilation for multicore CPU architectures.  
+
+Author: John A. Stratton 
+	stratton@illinois.edu
+
+This is a research prototype framework for compiling CUDA code for 
+multicore CPU execution.  The translation tool is based on the 
+Cetus framework distributed by Purdue University, which is 
+in turn reliant on the Antlr language parsing tool distributed 
+by the University of San Francisco.  
+
+Neither the names of the IMPACT Research Group, the University of Illinois, 
+nor the names of its contributors may be used to endorse or promote products 
+derived from this Software without specific prior written permission.  
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL 
+THE CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
+OTHER LIABILITY, WHETHER IN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
+OTHER DEALINGS WITH THE SOFTWARE.
+
+
+Quick Start:
+	Unpack the provided package, and run the install.sh script as root, 
+		answering its prompts.  
+	Add <MCUDA-install-dir>/bin to your path
+	Replace cuda.h and cutil.h with mcuda.h in your CUDA source files 
+		you wish to use with MCUDA.  (You may use the __MCUDA__ 
+		preprocessor macro, defined within the mcuda translation,
+		to version your code appropriately)
+	Run the executable script "mcuda" on your desired source file.  
+		It will output into a directory mcuda_output the resulting, 
+		translated source file.  All parameters after the source 
+		file name will be added to the gcc preprocessor command.
+	Compile the new source file just as you would any other c source file.
+	Alternatively, use the mcc script to translate and compile in one command, 
+		using the script parameters to configure the preprocessing, 
+		translation and compilation phases separately.
+
+
+System Requirements:
+
+Cetus is a java program infrastructure.  So using MCUDA requires the ability 
+to execute java programs.  Your system must have a Pthreads library to use the 
+pthreads or OpenMP runtime library.  If you wish to use the OpenMP library, we 
+currently only support icc as the OpenMP compiler, although your installation 
+can configure the specific path to the icc you want to use.  
+Failing those, you may compile with a serial (==boring) implementation.  
+
+Updates: 1.0.1
+Fixed a major oversight in the Pthreads implementation that makes performance 
+gains over sequential code actually possible.  
+
+
+
+Application limitations:
+
+Because the GPU instrinsics and programming model of CUDA have been changing 
+relatively rapidly, we do not support many of the newest available features.  
+Here are the primary list of limitations.  
+
+C++ syntax is not supported:
+	nvcc currently supports almost all of C++.  MCUDA requires a strict 
+	adherence to the C specification with the exception of the 
+	CUDA-specific language extensions.  Because of this, the cutil 
+	library distributed with the SDK is not supported.  
+
+Texture memory is not supported:
+	Textures are accessed through a C++ template class primarily, and 
+	without a C++ frontend, these cannot be processed correctly.  
+
+Implicit warp synchronization is not supported:
+	Because we are completely serializing all threads within a block, 
+	synchronous execution of any group of threads within a block 
+	must be enforced by explicit synchronization statements.  
+
+syncthreads calls cannot exist within thread-dependent control flow:
+	We base the efficiency of our translations on the vague specification 
+	of the CUDA programming model that all syncthreads calls can be 
+	control dependant on a contition only if that condition is independent 
+	of thread index.  
+
+Only structured control flow is supported:
+	While it's possible, perhaps even likely, the unstructured control 
+	flow will be treated successfully in some cases, we do not support 
+	all usages of any of the following constructs...
+	switch, continue, break, return, goto
+
+Only dim3 types are allowed as kernel configuration parameters for kernels:
+	nvcc recognizes integer types as kernel configuration parameters, 
+	automatically converting them to dim3 structures somewhere in their 
+	compiler.  MCUDA does not have this support at this time.
+
+Function inlining has name aliasing issues in some cases:
+	The Cetus function inliner assumes no naming conflicts between 
+	variables in the calling function and parameters in the inlined 
+	function.  For some programs, this name aliasing does occur, and 
+	may produce incorrect results.  
+
+Device Intrinsic functions are not verified:
+	To access the device functions that are supported, the 
+	CUDA math_functions.h and device_functions.h files must included in 
+	exactly one source file containing all of the kernels that use them.
+	However, they have not been tested, and it is at least known that with 
+	current CUDA releases, Atomic functions are not fully supported in 
+	emulation mode, which MCUDA relies on for any device function support.
+	MCUDA seems to verifiably fail for these functions when interfaced to 
+	a CUDA 2.0 installation.
+
+Only a subset of the CUDA memory copy functions are supported:
+	Since the CUDA runtime library allows asynchronous memory copies, 
+	and MCUDA translates kernels to look like host code, we cannot enforce 
+	synchronization between the two.  The mcuda runtime implements the 
+	basic memory management functions; examine mcutil.h to see the 
+	specific list of included functions.  
+
+extern __shared__ array[] syntax is not supported:
+	Translate it into a standard declaration with an array size 
+	if you want to use MCUDA.
