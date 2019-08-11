@@ -1,0 +1,46 @@
+selection methods:
+
+http://people.cs.missouri.edu/~skubicm/375/ParentSelection.htm:
+
+
+Parent Selection Methods for Genetic Algorithms
+
+(adapted from Graham Kendall, Univ. of Nottingham)
+
+ 
+
+Roulette Wheel Selection
+
+ 
+
+The idea behind the roulette wheel selection technique is that each individual is given a chance to become a parent in proportion to its fitness. It is called roulette wheel selection as the chances of selecting a parent can be seen as spinning a roulette wheel with the size of the slot for each parent being proportional to its fitness. Obviously those with the largest fitness (slot sizes) have more chance of being chosen.� Thus, it is possible for one member to dominate all the others and get selected a high proportion of the time.
+
+ 
+
+Roulette wheel selection can be implemented as follows:
+
+1.      Sum the fitness of all the population members. Call this TF (total fitness).
+
+2.      Generate a random number n, between 0 and TF.
+
+3.      Return the first population member whose fitness added to the preceding population members is greater than or equal to n.
+
+ 
+
+ 
+Tournament Selection
+
+ 
+
+Two methods are presented:
+
+ 
+
+    * Select a pair of individuals at random. Generate a random number, R, between 0 and 1. If R <� r use the first individual as a parent. If the R >= r then use the second individual as the parent. This is repeated to select the second parent. �(The value of r is a parameter to this method.)
+
+ 
+    * Select two individuals at random. The individual with the highest evaluation becomes the parent. Repeat to find a second parent.
+
+ 
+
+ 

@@ -1,0 +1,497 @@
+#define __CL_ENABLE_EXCEPTIONS
+#include <cl.hpp>			// for C++ bindings
+#include <string>
+#include <iostream>
+#include <string>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/resource.h>
+
+using std::cout;
+using std::cerr;
+using std::endl;
+using std::string;
+const int genes=4;
+const int dimension=5;
+const int population_number= 500;
+/////////////////////////////////////////////////////////////////
+// Helper function to print vector elements
+/////////////////////////////////////////////////////////////////
+void printVector(const std::string arrayName,
+const cl_float * arrayData,
+const unsigned int length)
+{
+int numElementsToPrint = (256 < length) ? 256 : length;
+cout << endl << arrayName << ":" << endl;
+for(int i = 0; i < numElementsToPrint; ++i)
+cout << arrayData[i] << " ";
+cout << endl;
+}
+/////////////////////////////////////////////////////////////////
+// Globals
+/////////////////////////////////////////////////////////////////
+int length = 256;
+cl_float * pX = NULL;
+cl_float * pY = NULL;
+cl_float * pZ = NULL;
+//cl_float a = 2.f;
+std::vector<cl::Platform> platforms;
+cl::Context context;
+std::vector<cl::Device> devices;
+cl::CommandQueue queue;
+cl::Program program;
+cl::Kernel kernel;
+cl::Buffer bufX;
+cl::Buffer bufY;
+cl::Buffer bufZ:
+
+float tot_fitness=0;
+float max_fitness=0;
+float min_fitness=0;
+typedef struct chromosome
+{																				//Define chromosome
+	int x[5][4];
+	float population_fitness;
+}chromosome;
+
+
+void *initialise_population(chromosome current_population[population_number])
+{																				//Initialise population randomly
+	int i,j,k;
+
+	for(i=0;i<population_number;i++)
+	{
+		for(k=0;k<dimension;k++)
+		{
+			for(j=0;j<genes;j++)
+			{
+				current_population[i].x[k][j]=rand()%2;
+			}
+		}
+	}
+
+}
+
+void *print_population(chromosome current_population[population_number])
+{																				//Display current population
+	int i,j,k;
+
+	for(i=0;i<population_number;i++)
+	{
+		for(k=0;k<dimension;k++)
+		{
+			printf("x[%d]=",k);
+			for(j=0;j<genes;j++)
+			{
+				printf("%d",current_population[i].x[k][j]);
+
+
+
+
+			}
+
+			printf("\t");
+
+		}
+		printf("\n");
+
+		}
+
+}
+
+float x_value(int m,int n, chromosome current_population[population_number])
+{																				//Convert binary to decimal
+float vlaue;
+/*if(current_population[m].x[n][3]==1)
+{
+vlaue = (-1)*(4*current_population[m].x[n][2]+2*current_population[m].x[n][1]+1*current_population[m].x[n][0]);
+
+}
+else*/
+{
+vlaue = (1)*(4*current_population[m].x[n][2]+2*current_population[m].x[n][1]+1*current_population[m].x[n][0]);
+
+
+}
+
+return(vlaue);
+
+}
+
+chromosome *parent_selection(chromosome current_population[population_number],chromosome selected_parent[2])
+{																			//Selection of parents by roulette wheel criteria but here the population with lowest fitness is taken as highly fittest
+int j,i,m;
+chromosome temp;
+
+for(j=0;j<2;j++)
+{
+int random = (rand()%(int)(tot_fitness-min_fitness+1))+min_fitness;
+
+//printf("\n\nrandom number is: %d\n",random);
+
+ int tf=0;
+
+ 	//chromosome selected_parent;
+
+ 	for(i=0;i<population_number;i++)
+ 	{
+		 tf=tf+current_population[i].population_fitness;
+		 //printf("\n\n\ntf=%d\n\n\n",tf);
+		 if(tf>=random)
+		 	 {selected_parent[j]=current_population[i];
+		 	 goto exit;}
+
+ 	}
+exit:printf("selected parent is: %f\n",selected_parent[j].population_fitness);
+}
+}
+
+
+
+
+chromosome crossover(chromosome selected_parent[2],chromosome child_generated[2])
+{
+int i,j,random;
+for(i=0;i<2;i++)
+{
+child_generated[i]=selected_parent[i];
+}
+//int random_dim=rand()%5;
+for(j=0;j<dimension;j++)
+{
+random = rand()%4;
+int rando = (3-random);
+for(i=0;i<random;i++)
+		{
+			child_generated[1].x[j][rando+i]=selected_parent[0].x[j][i];
+			child_generated[1].x[j][i]=selected_parent[0].x[j][rando+i];
+			child_generated[0].x[j][rando+i]=selected_parent[1].x[j][i];
+			child_generated[0].x[j][i]=selected_parent[1].x[j][rando+i];
+		}
+
+}
+
+}
+
+
+void *mutation(chromosome child_generated[2])
+{
+int j,col,i;
+//int rand_dim=rand()%5;
+for(i=0;i<2;i++)
+{
+for(j=0;j<dimension;j++)
+{
+
+//if(rand()%10<=7)
+		{
+			if(child_generated[i].x[j][0]==1)
+			{
+			col=rand()%3;
+			if(child_generated[i].x[j][col+1]==0)
+				child_generated[i].x[j][col+1]=1;
+			else if(child_generated[i].x[j][col+1]==1)
+				child_generated[i].x[j][col+1]=0;
+			}
+			else
+			{
+			child_generated[i].x[j][0]=1;
+
+			/*col=rand()%4;
+			if(child_generated[i].x[rand_dim][col]==0)
+				child_generated[i].x[rand_dim][col]=1;
+			else if(child_generated[i].x[rand_dim][col]==1)
+				child_generated[i].x[rand_dim][col]=0;
+			*/}
+
+}
+}
+}
+
+
+}
+
+double getcputime(void)
+             { struct timeval tim;
+               struct rusage ru;
+               getrusage(RUSAGE_SELF, &ru);
+               tim=ru.ru_utime;
+               double t=(double)tim.tv_sec + (double)tim.tv_usec / 1000000.0;
+               tim=ru.ru_stime;
+               t+=(double)tim.tv_sec + (double)tim.tv_usec / 1000000.0;
+               return t; }
+
+void print_parent(chromosome selected_parent[2])
+{
+int i,j,k;
+
+	for(i=0;i<2;i++)
+	{
+		for(k=0;k<dimension;k++)
+		{
+			printf("x[%d]=",k);
+			for(j=0;j<genes;j++)
+			{
+				printf("%d",selected_parent[i].x[k][j]);
+
+
+
+
+			}
+
+			printf("\t");
+
+		}
+		printf("\n");
+
+		}
+
+
+
+
+}
+
+main()
+{
+
+	clock_t start, end;
+	double cpu_time_used;
+	clock();
+	start = clock();
+	clock_t tms_utime;
+
+	unsigned int iseed = (unsigned int)time(NULL);
+	srand (iseed);
+
+
+	printf("start time=%ld",start);
+	printf("\n");
+
+	int k,i,j;
+
+	chromosome current_population[population_number];
+	chromosome selected_parent[2];
+	chromosome child_generated[2];
+	chromosome next_population[population_number];
+
+	initialise_population(current_population);
+	printf("\ncurrent population generated randomly\n");
+	print_population(current_population);
+	printf("\ncurrent population after evoultion\n");
+	evaluate_population(current_population);
+
+
+
+	for(k=0;k<50;k++)
+	{
+	printf("\nga started\n");
+
+	for(i=0;i<population_number/2;i++)
+	{
+	parent_selection(current_population,selected_parent);
+	printf("\nparent selected\n");
+	//print_parent( selected_parent);
+	crossover(selected_parent,child_generated);
+	printf("\nchild after crossover\n");
+	//print_parent( child_generated);
+	mutation(child_generated);
+	printf("\nchild after mutation\n");
+	//print_parent( child_generated);
+	for(j=0;j<2;j++)
+	{
+	next_population[i*2]=child_generated[j];
+	next_population[i*2+1]=child_generated[j+1];
+	}
+	}
+	for(i=0;i<population_number;i++)
+	{
+
+	current_population[i]=next_population[i];
+
+
+
+	}
+	printf("\nnext population\n");
+	print_population(current_population);
+	evaluate_population(current_population);
+	for (i=0; i<population_number; i++)
+		{
+			if (current_population[i].population_fitness == 00.0f)
+			{
+				printf("\nsolution found %dth population",i);
+				goto exit;
+			}
+		}
+	printf("\n\nnumber of itrations:%d\n\n",k);
+	}
+
+exit: printf("\n\nend of all itration:\n\n");
+printf("\nnumber of popuation=%d\n",population_number);
+	printf("\nnumber of dimensions=%d\n",dimension);
+end = clock();
+printf("end time=%ld",end);
+     cpu_time_used = getcputime() ;//((double) (end - start)) / CLOCKS_PER_SEC;
+printf("\ntime used=%lf",cpu_time_used);
+}
+
+/////////////////////////////////////////////////////////////////
+// The saxpy kernel
+/////////////////////////////////////////////////////////////////
+string kernelStr =
+"__kernel void saxpy(__global float * x,\n"
+" __global float * y,\n"
+" __global float * z)\n"
+"{\n"
+" uint gid = get_global_id(0);\n"
+" z[gid] = 100* (x[gid]- y[gid]*y[gid])*(x[gid]- y[gid]*y[gid])+(x[gid]-1)*(x[gid]-1);\n"
+"}\n";
+/////////////////////////////////////////////////////////////////
+// Allocate and initialize memory on the host
+/////////////////////////////////////////////////////////////////
+void initHost()
+{
+size_t sizeInBytes = length * sizeof(cl_float);
+pX = (cl_float *) malloc(sizeInBytes);
+if(pX == NULL)
+throw(string("Error: Failed to allocate input memory on host\n"));
+pY = (cl_float *) malloc(sizeInBytes);
+if(pY == NULL)
+throw(string("Error: Failed to allocate input memory on host\n"));
+pZ = (cl_float *) malloc(sizeInBytes);
+if(pZ == NULL)
+throw(string("Error: Failed to allocate input memory on host\n"));
+
+for(int i = 0; i < length; i++)
+{
+pX[i] = cl_float(i);
+pY[i] = cl_float(i);
+}
+printVector("X", pX, length);
+printVector("Y", pY, length);
+printVector("Z", pZ, length);
+}
+/////////////////////////////////////////////////////////////////
+// Release host memory
+/////////////////////////////////////////////////////////////////
+void cleanupHost()
+{
+if(pX)
+{
+free(pX);
+pX = NULL;
+}
+if(pY != NULL)
+{
+free(pY);
+pY = NULL;
+}
+if(pZ)
+{
+free(pZ);
+pZ = NULL;
+}
+}
+void
+main(int argc, char * argv[])
+{
+try
+{
+/////////////////////////////////////////////////////////////////
+// Allocate and initialize memory on the host
+/////////////////////////////////////////////////////////////////
+initHost();
+/////////////////////////////////////////////////////////////////
+// Find the platform
+/////////////////////////////////////////////////////////////////
+cl::Platform::get(&platforms);
+std::vector<cl::Platform>::iterator iter;
+for(iter = platforms.begin(); iter != platforms.end(); ++iter)
+{
+if((*iter).getInfo<CL_PLATFORM_VENDOR>() == "Advanced Micro
+Devices, Inc.")
+break;
+}
+/////////////////////////////////////////////////////////////////
+// Create an OpenCL context
+/////////////////////////////////////////////////////////////////
+cl_context_properties cps[3] = { CL_CONTEXT_PLATFORM,
+(cl_context_properties)(*iter)(), 0 };
+context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
+/////////////////////////////////////////////////////////////////
+// Detect OpenCL devices
+/////////////////////////////////////////////////////////////////
+devices = context.getInfo<CL_CONTEXT_DEVICES>();
+/////////////////////////////////////////////////////////////////
+// Create an OpenCL command queue
+/////////////////////////////////////////////////////////////////
+queue = cl::CommandQueue(context, devices[0]);
+/////////////////////////////////////////////////////////////////
+// Create OpenCL memory buffers
+/////////////////////////////////////////////////////////////////
+bufX = cl::Buffer(context,
+CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+sizeof(cl_float) * length,
+pX);
+bufY = cl::Buffer(context,
+CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+sizeof(cl_float) * length,
+pY);
+bufZ = cl::Buffer(context,
+CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+sizeof(cl_float) * length,
+pY);
+/////////////////////////////////////////////////////////////////
+// Load CL file, build CL program object, create CL kernel object
+/////////////////////////////////////////////////////////////////
+cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
+kernelStr.length()));
+program = cl::Program(context, sources);
+program.build(devices);
+kernel = cl::Kernel(program, "saxpy");
+/////////////////////////////////////////////////////////////////
+// Set the arguments that will be used for kernel execution
+/////////////////////////////////////////////////////////////////
+kernel.setArg(0, bufX);
+kernel.setArg(1, bufY);
+kernel.setArg(2, bufZ);
+/////////////////////////////////////////////////////////////////
+// Enqueue the kernel to the queue
+// with appropriate global and local work sizes
+/////////////////////////////////////////////////////////////////
+queue.enqueueNDRangeKernel(kernel, cl::NDRange(),
+cl::NDRange(length), cl::NDRange(64));
+/////////////////////////////////////////////////////////////////
+// Enqueue blocking call to read back buffer Y
+/////////////////////////////////////////////////////////////////
+queue.enqueueReadBuffer(bufX, CL_TRUE, 0, length *
+sizeof(cl_float), pX);
+printVector("X", pX, length);
+queue.enqueueReadBuffer(bufY, CL_TRUE, 0, length *
+sizeof(cl_float), pY);
+printVector("Y", pY, length);
+/////////////////////////////////////////////////////////////////
+// Release host resources
+/////////////////////////////////////////////////////////////////
+cleanupHost();
+}
+catch (cl::Error err)
+{
+/////////////////////////////////////////////////////////////////
+// Catch OpenCL errors and print log if it is a build error
+/////////////////////////////////////////////////////////////////
+cerr << "ERROR: " << err.what() << "(" << err.err() << ")" <<
+endl;
+if (err.err() == CL_BUILD_PROGRAM_FAILURE)
+{
+string str =program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
+cout << "Program Info: " << str << endl;
+}
+cleanupHost();
+}
+catch(string msg)
+{
+cerr << "Exception caught in main(): " << msg << endl;
+cleanupHost();
+}
+}
